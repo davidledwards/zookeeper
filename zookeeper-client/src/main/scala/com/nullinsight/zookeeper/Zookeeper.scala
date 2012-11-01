@@ -10,13 +10,61 @@ import scala.collection.JavaConverters._
 import scala.concurrent._
 import scala.language._
 
+/**
+ * An instance of a ZooKeeper client.
+ */
 trait Zookeeper {
+  /**
+   * Returns a view of this client in which operations are performed ''synchronously''.
+   * 
+   * @return a synchronous view of this client
+   */
   def sync: SynchronousZookeeper
+
+  /**
+   * Returns a view of this client in which operations are performed ''asynchronously''.
+   * 
+   * @return an asynchronous view of this client
+   */
   def async: AsynchronousZookeeper
-  def flush(path: String): Future[Unit]
+
+  /**
+   * Ensures that the value of a node, specified by the given path, is synchronized across the ZooKeeper cluster.
+   * 
+   * '''An important note on consistency''': ZooKeeper does not guarantee, for any given point in time, that all clients will
+   * have a consistent view of the cluster. Since reads can be served by any node in the cluster, whereas writes are serialized
+   * through the leader, there exists the possibility in which two separate clients may have inconsistent views. This scenario
+   * occurs when the leader commits a change once consensus is reached, but the change has not yet propagated across the
+   * cluster. Therefore, reads occurring before the commit has propagated will be globally inconsistent. This behavior is
+   * normally acceptable, but for some use cases, writes may need to be globally visible before subsequent reads occur.
+   * 
+   * This method is particularly useful when a ''write'' occurring in one process is followed by a ''read'' in another process.
+   * For example, consider the following sequence of operations:
+   * 
+   *  - process A writes a value
+   *  - process A sends a message to process B
+   *  - process B reads the value
+   * 
+   * The assumption is that process B expects to see the value written by process A, but as mentioned, ZooKeeper does not make
+   * this guarantee. A call to this method before process B attempts to read the value ensures that all prior writes are
+   * consistently applied across the cluster, thus observing the write in process A.
+   * 
+   * @return a future that completes when the node is synchronized across the cluster
+   */
+  def ensure(path: String): Future[Unit]
+
+  /**
+   * Closes the client connection to the ZooKeeper cluster.
+   * 
+   * A consequence of closing the connection is that ZooKeeper will expire the corresponding session, which further implies
+   * that all ephemeral nodes created by this client will be deleted.
+   */
   def close(): Unit
 }
 
+/**
+ * A ZooKeeper client with ''synchronous'' operations.
+ */
 trait SynchronousZookeeper extends Zookeeper {
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): String
   def delete(path: String, version: Int): Unit
@@ -30,12 +78,18 @@ trait SynchronousZookeeper extends Zookeeper {
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]]
 }
 
+/**
+ * A ZooKeeper client with ''synchronous'' and ''watchable'' operations.
+ */
 trait SynchronousWatchableZookeeper extends Zookeeper {
   def get(path: String): (Array[Byte], Node)
   def exists(path: String): Option[Node]
   def children(path: String): Seq[String]
 }
 
+/**
+ * A ZooKeeper client with ''asynchronous'' operations.
+ */
 trait AsynchronousZookeeper extends Zookeeper {
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String]
   def delete(path: String, version: Int): Future[Unit]
@@ -48,6 +102,9 @@ trait AsynchronousZookeeper extends Zookeeper {
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper
 }
 
+/**
+ * A ZooKeeper client with ''asynchronous'' and ''watchable'' operations.
+ */
 trait AsynchronousWatchableZookeeper extends Zookeeper {
   def get(path: String): Future[(Array[Byte], Node)]
   def exists(path: String): Future[Option[Node]]
@@ -61,7 +118,7 @@ private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
 
   def async: AsynchronousZookeeper = new AsynchronousZK(zk, exec)
 
-  def flush(path: String): Future[Unit] = {
+  def ensure(path: String): Future[Unit] = {
     val p = promise[Unit]
     zk.sync(path, VoidHandler(p), null)
     p.future
@@ -331,6 +388,9 @@ private object ExistsHandler {
   }
 }
 
+/**
+ * Constructs [[Zookeeper]] values.
+ */
 object Zookeeper {
   def apply(config: Configuration): Zookeeper = apply(config, null)
 
@@ -371,11 +431,27 @@ object Zookeeper {
   }
 }
 
+/**
+ * Constructs [[SynchronousZookeeper]] values.
+ * 
+ * This companion object is provided as a convenience and is equivalent to:
+ * {{{
+ * Zookeeper(...).sync
+ * }}}
+ */
 object SynchronousZookeeper {
   def apply(config: Configuration): SynchronousZookeeper = Zookeeper(config).sync
   def apply(config: Configuration, cred: Credential): SynchronousZookeeper = Zookeeper(config, cred).sync
 }
 
+/**
+ * Constructs [[AsynchronousZookeeper]] values.
+ * 
+ * This companion object is provided as a convenience and is equivalent to:
+ * {{{
+ * Zookeeper(...).async
+ * }}}
+ */
 object AsynchronousZookeeper {
   def apply(config: Configuration): AsynchronousZookeeper = Zookeeper(config).async
   def apply(config: Configuration, cred: Credential): AsynchronousZookeeper = Zookeeper(config, cred).async
