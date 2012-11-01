@@ -66,14 +66,96 @@ trait Zookeeper {
  * A ZooKeeper client with ''synchronous'' operations.
  */
 trait SynchronousZookeeper extends Zookeeper {
+  /**
+   * Creates a new node at the given path.
+   * 
+   * If a ''sequential'' [[Disposition disposition]] is provided in `disp`, then `path` is appended with a monotonically
+   * increasing sequence, thus guaranteeing that all sequential nodes are unique with `path` as their prefix.
+   * 
+   * @param path the path of the node to create
+   * @param data the data to associate with the node, which may be empty, but not `null`
+   * @param acl an access control list to apply to the node, which must not be empty
+   * @param disp the disposition of the node
+   * @return the final path of the created node, which will differ from `path` if `disp` is either [[PersistentSequential]]
+   * or [[EphemeralSequential]]
+   */
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): String
-  def delete(path: String, version: Int): Unit
+
+  /**
+   * Deletes the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * 
+   * @throws NoNodeException if the node does not exist
+   * @throws BadVersionException if `version` is specified and does not match the node version
+   * @throws NotEmptyException if the node contains children
+   */
+  def delete(path: String, version: Option[Int]): Unit
+
+  /**
+   * Returns the data and properties of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return a tuple containing the data and properties of the node
+   * 
+   * @throws NoNodeException if the node does not exist
+   */
   def get(path: String): (Array[Byte], Node)
-  def set(path: String, data: Array[Byte], version: Int): Node
+
+  /**
+   * Sets the data for the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param data the data to associate with the node, which may be empty, but not `null`
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * @return the properties of the node
+   * 
+   * @throws NoNodeException if the node does not exist
+   * @throws BadVersionException if `version` is specified and does not match the node version
+   */
+  def set(path: String, data: Array[Byte], version: Option[Int]): Node
+
+  /**
+   * Returns the properties of the node specified by the given path if it exists.
+   * 
+   * @param path the path of the node
+   * @return a `Some` containing the node properties or `None` if the node does not exist
+   */
   def exists(path: String): Option[Node]
+
+  /**
+   * Returns the children of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return an unordered sequence containing the names of each child node
+   * 
+   * @throws NoNodeException if the node does not exist
+   */
   def children(path: String): Seq[String]
+
+  /**
+   * Returns the ACL and properties of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return a tuple containing the ACL and properties of the node
+   * 
+   * @throws NoNodeException if the node does not exist
+   */
   def getACL(path: String): (Seq[ACL], Node)
-  def setACL(path: String, acl: Seq[ACL], version: Int): Node
+
+  /**
+   * Sets the ACL for the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param acl an access control list to apply to the node, which must not be empty
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * @return the properties of the node
+   * 
+   * @throws NoNodeException if the node does not exist
+   * @throws BadVersionException if `version` is specified and does not match the node version
+   */
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Node
   def watch(fn: PartialFunction[Event, Unit]): SynchronousWatchableZookeeper
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]]
 }
@@ -92,13 +174,13 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
  */
 trait AsynchronousZookeeper extends Zookeeper {
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String]
-  def delete(path: String, version: Int): Future[Unit]
+  def delete(path: String, version: Option[Int]): Future[Unit]
   def get(path: String): Future[(Array[Byte], Node)]
-  def set(path: String, data: Array[Byte], version: Int): Future[Node]
+  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Node]
   def exists(path: String): Future[Option[Node]]
   def children(path: String): Future[(Seq[String], Node)]
   def getACL(path: String): Future[(Seq[ACL], Node)]
-  def setACL(path: String, acl: Seq[ACL], version: Int): Future[Node]
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Node]
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper
 }
 
@@ -132,8 +214,8 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
     zk.create(path, data, ACL.toZACL(acl), disp.mode)
   }
 
-  def delete(path: String, version: Int) {
-    zk.delete(path, version)
+  def delete(path: String, version: Option[Int]) {
+    zk.delete(path, version getOrElse -1)
   }
 
   def get(path: String) = {
@@ -142,8 +224,8 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
     (data, Node(path, stat))
   }
 
-  def set(path: String, data: Array[Byte], version: Int) = {
-    val stat = zk.setData(path, data, version)
+  def set(path: String, data: Array[Byte], version: Option[Int]) = {
+    val stat = zk.setData(path, data, version getOrElse -1)
     Node(path, stat)
   }
 
@@ -162,8 +244,8 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
     (ACL(zacl), Node(path, stat))
   }
 
-  def setACL(path: String, acl: Seq[ACL], version: Int) = {
-    val stat = zk.setACL(path, ACL.toZACL(acl), version)
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]) = {
+    val stat = zk.setACL(path, ACL.toZACL(acl), version getOrElse -1)
     Node(path, stat)
   }
 
@@ -234,9 +316,9 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
     p.future
   }
 
-  def delete(path: String, version: Int): Future[Unit] = {
+  def delete(path: String, version: Option[Int]): Future[Unit] = {
     val p = promise[Unit]
-    zk.delete(path, version, VoidHandler(p), null)
+    zk.delete(path, version getOrElse -1, VoidHandler(p), null)
     p.future
   }
 
@@ -246,9 +328,9 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
     p.future
   }
 
-  def set(path: String, data: Array[Byte], version: Int): Future[Node] = {
+  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Node] = {
     val p = promise[Node]
-    zk.setData(path, data, version, StatHandler(p), null)
+    zk.setData(path, data, version getOrElse -1, StatHandler(p), null)
     p.future
   }
 
@@ -270,9 +352,9 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
     p.future
   }
 
-  def setACL(path: String, acl: Seq[ACL], version: Int): Future[Node] = {
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Node] = {
     val p = promise[Node]
-    zk.setACL(path, ACL.toZACL(acl), version, StatHandler(p), null)
+    zk.setACL(path, ACL.toZACL(acl), version getOrElse -1, StatHandler(p), null)
     p.future
   }
 
@@ -392,15 +474,34 @@ private object ExistsHandler {
  * Constructs [[Zookeeper]] values.
  */
 object Zookeeper {
+  /**
+   * Constructs a new ZooKeeper client using the given configuration.
+   * 
+   * @param config the client configuration
+   * @return a client with the given `config`
+   */
   def apply(config: Configuration): Zookeeper = apply(config, null)
 
+  /**
+   * Constructs a new ZooKeeper client using the given configuration and session credential.
+   * 
+   * @param config the client configuration
+   * @param cred the session credentials
+   * @return a client with the given `config` and `cred`
+   */
   def apply(config: Configuration, cred: Credential): Zookeeper = {
     val servers = ("" /: config.servers) {
       case (buf, addr) => (if (buf.isEmpty) buf else buf + ",") + addr.getHostName + ":" + addr.getPort
     }
     val path = (if (config.path startsWith "/") "" else "/") + config.path
-    val timeout = config.timeout.toMillis.asInstanceOf[Int]
-    val watcher = new ConnectionWatcher(if (config.watcher == null) (_: StateEvent, _: Session) => () else config.watcher)
+    val timeout = {
+      val millis = config.timeout.toMillis
+      if (millis < 0) 0 else if (millis > Int.MaxValue) Int.MaxValue else millis.asInstanceOf[Int]
+    }
+    val watcher = {
+      val fn = if (config.watcher == null) (_: StateEvent, _: Session) => () else config.watcher
+      new ConnectionWatcher(fn)
+    }
     val exec = if (config.exec == null) ExecutionContext.global else config.exec
     val zk = cred match {
       case null => new ZooKeeper(servers + path, timeout, watcher, config.allowReadOnly)
@@ -426,7 +527,7 @@ object Zookeeper {
 
     def associate(zk: ZooKeeper) {
       if (!ref.compareAndSet(null, zk))
-        throw new IllegalStateException("zookeeper instance already associated")
+        throw new AssertionError("zookeeper instance already associated")
     }
   }
 }
@@ -438,9 +539,25 @@ object Zookeeper {
  * {{{
  * Zookeeper(...).sync
  * }}}
+ * 
+ * @see [[Zookeeper]]
  */
 object SynchronousZookeeper {
+  /**
+   * Constructs a new synchronous ZooKeeper client using the given configuration.
+   * 
+   * @param config the client configuration
+   * @return a client with the given `config`
+   */
   def apply(config: Configuration): SynchronousZookeeper = Zookeeper(config).sync
+
+  /**
+   * Constructs a new synchronous ZooKeeper client using the given configuration and session credential.
+   * 
+   * @param config the client configuration
+   * @param cred the session credentials
+   * @return a client with the given `config` and `cred`
+   */
   def apply(config: Configuration, cred: Credential): SynchronousZookeeper = Zookeeper(config, cred).sync
 }
 
@@ -451,8 +568,24 @@ object SynchronousZookeeper {
  * {{{
  * Zookeeper(...).async
  * }}}
+ * 
+ * @see [[Zookeeper]]
  */
 object AsynchronousZookeeper {
+  /**
+   * Constructs a new asynchronous ZooKeeper client using the given configuration.
+   * 
+   * @param config the client configuration
+   * @return a client with the given `config`
+   */
   def apply(config: Configuration): AsynchronousZookeeper = Zookeeper(config).async
+
+  /**
+   * Constructs a new asynchronous ZooKeeper client using the given configuration and session credential.
+   * 
+   * @param config the client configuration
+   * @param cred the session credentials
+   * @return a client with the given `config` and `cred`
+   */
   def apply(config: Configuration, cred: Credential): AsynchronousZookeeper = Zookeeper(config, cred).async
 }
