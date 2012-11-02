@@ -2,8 +2,7 @@ package com.nullinsight.zookeeper
 
 import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext
-import scala.concurrent.util._
-import scala.concurrent.util.duration._
+import scala.concurrent.duration._
 import scala.language._
 
 /**

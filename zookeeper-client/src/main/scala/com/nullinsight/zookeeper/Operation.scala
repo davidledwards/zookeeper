@@ -31,20 +31,20 @@ case class CreateOperation(path: String, data: Array[Byte], acl: Seq[ACL], disp:
  * A ''delete'' operation.
  * 
  * @param path the path of the node
- * @param version the expected version of the node or `-1` to match any version
+ * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
-case class DeleteOperation(path: String, version: Int) extends Operation {
-  private[zookeeper] val op: Op = Op.delete(path, version)
+case class DeleteOperation(path: String, version: Option[Int]) extends Operation {
+  private[zookeeper] val op: Op = Op.delete(path, version getOrElse -1)
 }
 
 /**
  * A ''check'' operation.
  * 
  * @param path the path of the node
- * @param version the expected version of the node
+ * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
-case class CheckOperation(path: String, version: Int) extends Operation {
-  private[zookeeper] val op: Op = Op.check(path, version)
+case class CheckOperation(path: String, version: Option[Int]) extends Operation {
+  private[zookeeper] val op: Op = Op.check(path, version getOrElse -1)
 }
 
 /**
@@ -52,10 +52,10 @@ case class CheckOperation(path: String, version: Int) extends Operation {
  * 
  * @param path the path of the node
  * @param data the data to associate with the node
- * @param version the expected version of the node or `-1` to match any version
+ * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
-case class SetOperation(path: String, data: Array[Byte], version: Int) extends Operation {
-  private[zookeeper] val op: Op = Op.setData(path, data, version)
+case class SetOperation(path: String, data: Array[Byte], version: Option[Int]) extends Operation {
+  private[zookeeper] val op: Op = Op.setData(path, data, version getOrElse -1)
 }
 
 /**

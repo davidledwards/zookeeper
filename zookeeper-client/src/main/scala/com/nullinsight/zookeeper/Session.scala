@@ -1,8 +1,7 @@
 package com.nullinsight.zookeeper
 
 import org.apache.zookeeper.ZooKeeper
-import scala.concurrent.util._
-import scala.concurrent.util.duration._
+import scala.concurrent.duration._
 import scala.language._
 
 /**

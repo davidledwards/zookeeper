@@ -156,7 +156,41 @@ trait SynchronousZookeeper extends Zookeeper {
    * @throws BadVersionException if `version` is specified and does not match the node version
    */
   def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Node
+
+  /**
+   * Returns a synchronous client in which operations implicitly attach the specified watch function.
+   * 
+   * The partial function `fn` is invoked when a watch is triggered or the session state changes. This method is typically
+   * used in a transient manner to introduce a watch function prior to performing a watchable ZooKeeper operation.
+   * 
+   * Example:
+   * {{{
+   * val zk = SynchronousZookeeper(config)
+   * val (data, node) = zk watch {
+   *   case e: NodeEvent => ...
+   *   case e: StateEvent => ...
+   * } get "/foo"
+   * }}}
+   */
   def watch(fn: PartialFunction[Event, Unit]): SynchronousWatchableZookeeper
+
+  /**
+   * Atomically performs a set of operations, either committing all or none.
+   * 
+   * The set of operations are applied by ZooKeeper in sequential order. If successful, this method returns a `Right`
+   * containing a sequence of results that positionally correlate to the sequence of operations. Otherwise, it returns a
+   * `Left` similarly containing a sequence of problems.
+   * 
+   * Example:
+   * {{{
+   * val ops = CheckOperation("/foo", None) ::
+   *           CreateOperation("/bar", Array(), ACL.EveryoneAll, Persistent) :: Nil
+   * zk transact ops match {
+   *   case Right(results) => ...
+   *   case Left(problems) => ...
+   * }
+   * }}}
+   */
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]]
 }
 
