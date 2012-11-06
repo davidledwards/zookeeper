@@ -97,11 +97,11 @@ trait SynchronousZookeeper extends Zookeeper {
    * Returns the data and properties of the node specified by the given path.
    * 
    * @param path the path of the node
-   * @return a tuple containing the data and properties of the node
+   * @return a tuple containing the data and status of the node
    * 
    * @throws NoNodeException if the node does not exist
    */
-  def get(path: String): (Array[Byte], Node)
+  def get(path: String): (Array[Byte], Status)
 
   /**
    * Sets the data for the node specified by the given path.
@@ -109,20 +109,20 @@ trait SynchronousZookeeper extends Zookeeper {
    * @param path the path of the node
    * @param data the data to associate with the node, which may be empty, but not `null`
    * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
-   * @return the properties of the node
+   * @return the status of the node
    * 
    * @throws NoNodeException if the node does not exist
    * @throws BadVersionException if `version` is specified and does not match the node version
    */
-  def set(path: String, data: Array[Byte], version: Option[Int]): Node
+  def set(path: String, data: Array[Byte], version: Option[Int]): Status
 
   /**
    * Returns the properties of the node specified by the given path if it exists.
    * 
    * @param path the path of the node
-   * @return a `Some` containing the node properties or `None` if the node does not exist
+   * @return a `Some` containing the node status or `None` if the node does not exist
    */
-  def exists(path: String): Option[Node]
+  def exists(path: String): Option[Status]
 
   /**
    * Returns the children of the node specified by the given path.
@@ -138,11 +138,11 @@ trait SynchronousZookeeper extends Zookeeper {
    * Returns the ACL and properties of the node specified by the given path.
    * 
    * @param path the path of the node
-   * @return a tuple containing the ACL and properties of the node
+   * @return a tuple containing the ACL and status of the node
    * 
    * @throws NoNodeException if the node does not exist
    */
-  def getACL(path: String): (Seq[ACL], Node)
+  def getACL(path: String): (Seq[ACL], Status)
 
   /**
    * Sets the ACL for the node specified by the given path.
@@ -150,12 +150,12 @@ trait SynchronousZookeeper extends Zookeeper {
    * @param path the path of the node
    * @param acl an access control list to apply to the node, which must not be empty
    * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
-   * @return the properties of the node
+   * @return the status of the node
    * 
    * @throws NoNodeException if the node does not exist
    * @throws BadVersionException if `version` is specified and does not match the node version
    */
-  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Node
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Status
 
   /**
    * Returns a synchronous client in which operations implicitly attach the specified watch function.
@@ -198,8 +198,8 @@ trait SynchronousZookeeper extends Zookeeper {
  * A ZooKeeper client with ''synchronous'' and ''watchable'' operations.
  */
 trait SynchronousWatchableZookeeper extends Zookeeper {
-  def get(path: String): (Array[Byte], Node)
-  def exists(path: String): Option[Node]
+  def get(path: String): (Array[Byte], Status)
+  def exists(path: String): Option[Status]
   def children(path: String): Seq[String]
 }
 
@@ -209,12 +209,12 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
 trait AsynchronousZookeeper extends Zookeeper {
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String]
   def delete(path: String, version: Option[Int]): Future[Unit]
-  def get(path: String): Future[(Array[Byte], Node)]
-  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Node]
-  def exists(path: String): Future[Option[Node]]
-  def children(path: String): Future[(Seq[String], Node)]
-  def getACL(path: String): Future[(Seq[ACL], Node)]
-  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Node]
+  def get(path: String): Future[(Array[Byte], Status)]
+  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Status]
+  def exists(path: String): Future[Option[Status]]
+  def children(path: String): Future[(Seq[String], Status)]
+  def getACL(path: String): Future[(Seq[ACL], Status)]
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Status]
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper
 }
 
@@ -222,9 +222,9 @@ trait AsynchronousZookeeper extends Zookeeper {
  * A ZooKeeper client with ''asynchronous'' and ''watchable'' operations.
  */
 trait AsynchronousWatchableZookeeper extends Zookeeper {
-  def get(path: String): Future[(Array[Byte], Node)]
-  def exists(path: String): Future[Option[Node]]
-  def children(path: String): Future[(Seq[String], Node)]
+  def get(path: String): Future[(Array[Byte], Status)]
+  def exists(path: String): Future[Option[Status]]
+  def children(path: String): Future[(Seq[String], Status)]
 }
 
 private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
@@ -252,38 +252,38 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
     zk.delete(path, version getOrElse -1)
   }
 
-  def get(path: String) = {
+  def get(path: String): (Array[Byte], Status) = {
     val stat = new Stat
     val data = zk.getData(path, false, stat)
-    (data, Node(path, stat))
+    (data, Status(path, stat))
   }
 
-  def set(path: String, data: Array[Byte], version: Option[Int]) = {
+  def set(path: String, data: Array[Byte], version: Option[Int]): Status = {
     val stat = zk.setData(path, data, version getOrElse -1)
-    Node(path, stat)
+    Status(path, stat)
   }
 
-  def exists(path: String) = {
+  def exists(path: String): Option[Status] = {
     val stat = zk.exists(path, false)
-    if (stat == null) None else Some(Node(path, stat))
+    if (stat == null) None else Some(Status(path, stat))
   }
 
-  def children(path: String) = {
+  def children(path: String): Seq[String] = {
     zk.getChildren(path, false).asScala.toList
   }
 
-  def getACL(path: String) = {
+  def getACL(path: String): (Seq[ACL], Status) = {
     val stat = new Stat
     val zacl = zk.getACL(path, stat)
-    (ACL(zacl), Node(path, stat))
+    (ACL(zacl), Status(path, stat))
   }
 
-  def setACL(path: String, acl: Seq[ACL], version: Option[Int]) = {
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Status = {
     val stat = zk.setACL(path, ACL.toZACL(acl), version getOrElse -1)
-    Node(path, stat)
+    Status(path, stat)
   }
 
-  def watch(fn: PartialFunction[Event, Unit]) = {
+  def watch(fn: PartialFunction[Event, Unit]): SynchronousWatchableZookeeper = {
     new SynchronousWatchableZK(zk, exec, fn)
   }
 
@@ -295,7 +295,7 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
         case (op, result) => op match {
           case _op: CreateOperation => CreateResult(_op, result.asInstanceOf[OpResult.CreateResult].getPath)
           case _op: DeleteOperation => DeleteResult(_op)
-          case _op: SetOperation => SetResult(_op, Node(_op.path, result.asInstanceOf[OpResult.SetDataResult].getStat))
+          case _op: SetOperation => SetResult(_op, Status(_op.path, result.asInstanceOf[OpResult.SetDataResult].getStat))
           case _op: CheckOperation => CheckResult(_op)
         }
       })
@@ -325,15 +325,15 @@ private class SynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: 
     }
   }
 
-  def get(path: String) = {
+  def get(path: String): (Array[Byte], Status) = {
     val stat = new Stat
     val data = zk.getData(path, watcher, stat)
-    (data, Node(path, stat))
+    (data, Status(path, stat))
   }
 
-  def exists(path: String) = {
+  def exists(path: String): Option[Status] = {
     val stat = zk.exists(path, watcher)
-    if (stat == null) None else Some(Node(path, stat))
+    if (stat == null) None else Some(Status(path, stat))
   }
 
   def children(path: String): Seq[String] = {
@@ -356,38 +356,38 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
     p.future
   }
 
-  def get(path: String): Future[(Array[Byte], Node)] = {
-    val p = promise[(Array[Byte], Node)]
+  def get(path: String): Future[(Array[Byte], Status)] = {
+    val p = promise[(Array[Byte], Status)]
     zk.getData(path, false, DataHandler(p), null)
     p.future
   }
 
-  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Node] = {
-    val p = promise[Node]
+  def set(path: String, data: Array[Byte], version: Option[Int]): Future[Status] = {
+    val p = promise[Status]
     zk.setData(path, data, version getOrElse -1, StatHandler(p), null)
     p.future
   }
 
-  def exists(path: String): Future[Option[Node]] = {
-    val p = promise[Option[Node]]
+  def exists(path: String): Future[Option[Status]] = {
+    val p = promise[Option[Status]]
     zk.exists(path, false, ExistsHandler(p), null)
     p.future
   }
 
-  def children(path: String): Future[(Seq[String], Node)] = {
-    val p = promise[(Seq[String], Node)]
+  def children(path: String): Future[(Seq[String], Status)] = {
+    val p = promise[(Seq[String], Status)]
     zk.getChildren(path, false, ChildrenHandler(p), null)
     p.future
   }
 
-  def getACL(path: String): Future[(Seq[ACL], Node)] = {
-    val p = promise[(Seq[ACL], Node)]
+  def getACL(path: String): Future[(Seq[ACL], Status)] = {
+    val p = promise[(Seq[ACL], Status)]
     zk.getACL(path, new Stat, ACLHandler(p), null)
     p.future
   }
 
-  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Node] = {
-    val p = promise[Node]
+  def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Status] = {
+    val p = promise[Status]
     zk.setACL(path, ACL.toZACL(acl), version getOrElse -1, StatHandler(p), null)
     p.future
   }
@@ -408,20 +408,20 @@ private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn:
     }
   }
 
-  def get(path: String): Future[(Array[Byte], Node)] = {
-    val p = promise[(Array[Byte], Node)]
+  def get(path: String): Future[(Array[Byte], Status)] = {
+    val p = promise[(Array[Byte], Status)]
     zk.getData(path, watcher, DataHandler(p), null)
     p.future
   }
 
-  def exists(path: String): Future[Option[Node]] = {
-    val p = promise[Option[Node]]
+  def exists(path: String): Future[Option[Status]] = {
+    val p = promise[Option[Status]]
     zk.exists(path, watcher, ExistsHandler(p), null)
     p.future
   }
 
-  def children(path: String): Future[(Seq[String], Node)] = {
-    val p = promise[(Seq[String], Node)]
+  def children(path: String): Future[(Seq[String], Status)] = {
+    val p = promise[(Seq[String], Status)]
     zk.getChildren(path, watcher, ChildrenHandler(p), null)
     p.future
   }
@@ -430,7 +430,7 @@ private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn:
 private object StringHandler {
   def apply(p: Promise[String]) = new AsyncCallback.StringCallback {
     def processResult(rc: Int, path: String, context: Object, name: String) {
-      Code.get(rc) match {
+      (Code.get(rc): @unchecked) match {
         case Code.OK => p success name
         case code => p failure ZException.create(code)
       }
@@ -441,7 +441,7 @@ private object StringHandler {
 private object VoidHandler {
   def apply(p: Promise[Unit]) = new AsyncCallback.VoidCallback {
     def processResult(rc: Int, path: String, context: Object) {
-      Code.get(rc) match {
+      (Code.get(rc): @unchecked) match {
         case Code.OK => p success ()
         case code => p failure ZException.create(code)
       }
@@ -450,10 +450,10 @@ private object VoidHandler {
 }
 
 private object DataHandler {
-  def apply(p: Promise[(Array[Byte], Node)]) = new AsyncCallback.DataCallback {
+  def apply(p: Promise[(Array[Byte], Status)]) = new AsyncCallback.DataCallback {
     def processResult(rc: Int, path: String, context: Object, data: Array[Byte], stat: Stat) {
-      Code.get(rc) match {
-        case Code.OK => p success (data, Node(path, stat))
+      (Code.get(rc): @unchecked) match {
+        case Code.OK => p success (data, Status(path, stat))
         case code => p failure ZException.create(code)
       }
     }
@@ -461,10 +461,10 @@ private object DataHandler {
 }
 
 private object ChildrenHandler {
-  def apply(p: Promise[(Seq[String], Node)]) = new AsyncCallback.Children2Callback {
+  def apply(p: Promise[(Seq[String], Status)]) = new AsyncCallback.Children2Callback {
     def processResult(rc: Int, path: String, context: Object, children: java.util.List[String], stat: Stat) {
-      Code.get(rc) match {
-        case Code.OK => p success (children.asScala.toList, Node(path, stat))
+      (Code.get(rc): @unchecked) match {
+        case Code.OK => p success (children.asScala.toList, Status(path, stat))
         case code => p failure ZException.create(code)
       }
     }
@@ -472,10 +472,10 @@ private object ChildrenHandler {
 }
 
 private object ACLHandler {
-  def apply(p: Promise[(Seq[ACL], Node)]) = new AsyncCallback.ACLCallback {
+  def apply(p: Promise[(Seq[ACL], Status)]) = new AsyncCallback.ACLCallback {
     def processResult(rc: Int, path: String, context: Object, zacl: java.util.List[ZACL], stat: Stat) {
-      Code.get(rc) match {
-        case Code.OK => p success (ACL(zacl), Node(path, stat))
+      (Code.get(rc): @unchecked) match {
+        case Code.OK => p success (ACL(zacl), Status(path, stat))
         case code => p failure ZException.create(code)
       }
     }
@@ -483,10 +483,10 @@ private object ACLHandler {
 }
 
 private object StatHandler {
-  def apply(p: Promise[Node]) = new AsyncCallback.StatCallback {
+  def apply(p: Promise[Status]) = new AsyncCallback.StatCallback {
     def processResult(rc: Int, path: String, context: Object, stat: Stat) {
-      Code.get(rc) match {
-        case Code.OK => p success Node(path, stat)
+      (Code.get(rc): @unchecked) match {
+        case Code.OK => p success Status(path, stat)
         case code => p failure ZException.create(code)
       }
     }
@@ -494,10 +494,10 @@ private object StatHandler {
 }
 
 private object ExistsHandler {
-  def apply(p: Promise[Option[Node]]) = new AsyncCallback.StatCallback {
+  def apply(p: Promise[Option[Status]]) = new AsyncCallback.StatCallback {
     def processResult(rc: Int, path: String, context: Object, stat: Stat) {
-      Code.get(rc) match {
-        case Code.OK => p success (if (stat == null) None else Some(Node(path, stat)))
+      (Code.get(rc): @unchecked) match {
+        case Code.OK => p success (if (stat == null) None else Some(Status(path, stat)))
         case code => p failure ZException.create(code)
       }
     }

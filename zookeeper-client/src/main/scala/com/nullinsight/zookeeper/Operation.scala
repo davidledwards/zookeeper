@@ -90,9 +90,9 @@ case class DeleteResult(op: DeleteOperation) extends Result
  * The result of a ''set'' operation.
  * 
  * @param op the set operation corresponding to this result
- * @param node the properties of the node after the operation is applied
+ * @param node the status of the node after the operation is applied
  */
-case class SetResult(op: SetOperation, node: Node) extends Result
+case class SetResult(op: SetOperation, status: Status) extends Result
 
 /**
  * The result of a ''check'' operation.

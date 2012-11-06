@@ -3,7 +3,7 @@ package com.nullinsight.zookeeper
 import org.apache.zookeeper.data.Stat
 
 /**
- * A ZooKeeper node and its corresponding properties.
+ * The ''status'' of a ZooKeeper node.
  * 
  * Each modification to ZooKeeper is stamped with a monotonically-increasing sequence number, known as a ''transaction id'' or
  * ''zxid'', which conveys a total ordering of all changes. Thus, given any two changes, A and B, denoted by transaction ids,
@@ -13,7 +13,7 @@ import org.apache.zookeeper.data.Stat
  * In addition to stamping all repository changes with a transaction id, which establishes total order, each modification to a
  * given node also causes some ''version'' of that node to increment.
  */
-trait Node {
+trait Status {
   /**
    * Returns the path of this node.
    */
@@ -75,10 +75,10 @@ trait Node {
   def numChildren: Int
 }
 
-private[zookeeper] object Node {
-  def apply(path: String, stat: Stat): Node = {
+private[zookeeper] object Status {
+  def apply(path: String, stat: Stat): Status = {
     val _path = path
-    new Node {
+    new Status{
       val path: String = _path
       val czxid: Long = stat.getCzxid
       val mzxid: Long = stat.getMzxid
@@ -93,7 +93,7 @@ private[zookeeper] object Node {
       val numChildren: Int = stat.getNumChildren
 
       override def toString: String = {
-        "Node(path=" + path + ",czxid=" + czxid + ",mzxid=" + mzxid + ",ctime=" + ctime + ",mtime=" +
+        "Status(path=" + path + ",czxid=" + czxid + ",mzxid=" + mzxid + ",ctime=" + ctime + ",mtime=" +
         mtime + ",version=" + version + ",cversion=" + cversion + ",aversion=" + aversion + ",ephemeralOwner=" +
         ephemeralOwner + ",dataLength=" + dataLength + ",numChildren=" + numChildren + ")"
       }
