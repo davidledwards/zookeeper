@@ -7,17 +7,63 @@ import scala.collection.immutable.Stack
 
 trait Path {
   def parent: Path
-  def elements: Seq[String]
-  def resolve(path: String*): Path
+  def parts: Seq[String]
+  def resolve(path: String): Path
+  def normalize: Path
 }
 
 object Path {
   def apply(path: String): Path = {
-    // compress path first
-    null
+    new Impl(compress(path))
   }
 
-  def compress(path: String): String = {
+  private def apply(parts: Seq[String]): Path = {
+    new Impl(parts mkString "/")
+  }
+
+  private class Impl(path: String) extends Path {
+    lazy val parent: Path = {
+      parts match {
+        case Seq() => throw new NoSuchElementException("no parent node")
+        case _ => Path(parts dropRight 1)
+      }
+    }
+
+    lazy val parts: Seq[String] = parse(path)
+
+    def resolve(path: String): Path = {
+      Path(path.headOption match {
+        case Some('/') => path
+        case _ => this.path + "/" + path
+      })
+    }
+
+    def normalize: Path = {
+      @tailrec def reduce(parts: Seq[String], stack: Stack[String]): Stack[String] = {
+        parts.headOption match {
+          case Some(part) =>
+            reduce(parts.tail, part match {
+              case ".." => stack.headOption match {
+                case Some(top) => if (top == "") stack else if (top == "..") stack.push(part) else stack.pop
+                case _ => stack.push(part)
+              }
+              case "." => stack
+              case _ => stack.push(part)
+            })
+          case _ => stack
+        }
+      }
+      val stack = reduce(parse(path), Stack()).reverse
+      Path(stack.head match {
+        case "" => "/" + (stack.tail mkString "/")
+        case _ => stack mkString "/"
+      })
+    }
+
+    override def toString: String = path
+  }
+
+  private def compress(path: String): String = {
     @tailrec def munch(path: Seq[Char]): Seq[Char] = {
       path.headOption match {
         case Some('/') => munch(path.tail)
@@ -37,31 +83,7 @@ object Path {
     }).toString
   }
 
-  def parse(path: String): Seq[String] = {
-    compress(path) split '/'
-  }
-
-  def normalize(path: String): String = {
-    @tailrec def process(parts: Seq[String], stack: Stack[String]): Stack[String] = {
-      parts.headOption match {
-        case Some(part) =>
-          process(parts.tail, part match {
-            case ".." => stack.headOption match {
-              case Some(top) => if (top == "") stack else if (top == "..") stack.push(part) else stack.pop
-              case _ => stack.push(part)
-            }
-            case "." => stack
-            case _ => stack.push(part)
-          })
-        case _ => stack
-      }
-    }
-    val stack = process(parse(path), Stack()).reverse
-    stack.head match {
-      case "" => "/" + (stack.tail mkString "/")
-      case _ => stack mkString "/"
-    }
-  }
+  private def parse(path: String): Seq[String] = compress(path) split '/'
 }
 
 object PathTest {
@@ -73,6 +95,9 @@ object PathTest {
     fix("//foo///bar//")
     parse("/foo/bar/baz/")
     parse("foo//bar//")
+    parse("")
+    parse("foo/bar")
+    parse("/foo/bar")
     norm("foo/../bar/./baz")
     norm("foo/../bar/./../baz")
     norm("foo/../bar/./../../baz")
@@ -81,19 +106,26 @@ object PathTest {
     norm("/../../../")
     norm("")
     norm("foo")
+    println("--- resolve ---")
+    resolve("foo/bar", "baz")
+    resolve("foo/bar", "/baz")
+    resolve("foo/bar", "../baz")
   }
 
   private def fix(path: String) {
-    import Path._
-    println(path + " --> " + compress(path))
+    println(path + " --> " + Path(path))
   }
 
   private def parse(path: String) {
-    println(path + " ==> " + Path.parse(path))
+    val parts = Path(path).parts
+    println(path + " ==> " + parts + ", size=" + parts.size)
   }
 
   private def norm(path: String) {
-    import Path._
-    println(path + " ~~> " + normalize(path))
+    println(path + " ~~> " + Path(path).normalize)
+  }
+
+  private def resolve(a: String, b: String) {
+    println(a + " + " + b + " --> " + Path(a).resolve(b))
   }
 }
