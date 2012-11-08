@@ -6,10 +6,13 @@ import scala.language._
 import scala.collection.immutable.Stack
 
 trait Path {
+  def path: String
   def parent: Path
   def parts: Seq[String]
   def resolve(path: String): Path
+  def resolve(path: Path): Path
   def normalize: Path
+  def isAbsolute: Boolean
 }
 
 object Path {
@@ -21,11 +24,15 @@ object Path {
     new Impl(parts mkString "/")
   }
 
-  private class Impl(path: String) extends Path {
+  private class Impl(val path: String) extends Path {
     lazy val parent: Path = {
-      if (parts.size > 1)
-        Path(parts dropRight 1)
-      else
+      if (parts.size > 1) {
+        val _parts = parts dropRight 1
+        Path(_parts.last match {
+          case "" => "/"
+          case _ => _parts mkString "/"
+        })
+      } else
         throw new NoSuchElementException("no parent node")
     }
 
@@ -33,10 +40,14 @@ object Path {
 
     def resolve(path: String): Path = {
       Path(path.headOption match {
+        case None => this.path
         case Some('/') => path
+        case _ if this.path.isEmpty => path
         case _ => this.path + "/" + path
       })
     }
+
+    def resolve(path: Path): Path = resolve(path.path)
 
     def normalize: Path = {
       @tailrec def reduce(parts: Seq[String], stack: Stack[String]): Stack[String] = {
@@ -54,11 +65,14 @@ object Path {
         }
       }
       val stack = reduce(parse(path), Stack()).reverse
-      Path(stack.head match {
-        case "" => "/" + (stack.tail mkString "/")
+      Path(stack.headOption match {
+        case None => ""
+        case Some("") => "/" + (stack.tail mkString "/")
         case _ => stack mkString "/"
       })
     }
+
+    lazy val isAbsolute: Boolean = path.headOption == Some('/')
 
     override def toString: String = path
   }
@@ -77,67 +91,14 @@ object Path {
       }
     }
     val to = collapse(path.seq, new StringBuilder)
-    (to.lastOption match {
-      case Some('/') => to.dropRight(1)
-      case _ => to
-    }).toString
+    (if (to.size > 1 && to.last == '/') to.dropRight(1) else to).toString
   }
 
-  private def parse(path: String): Seq[String] = compress(path) split '/'
-}
-
-object PathTest {
-  def main(args: Array[String]) {
-    fix("")
-    fix("/foo")
-    fix("foo/bar")
-    fix("foo//bar")
-    fix("//foo///bar//")
-    parse("/foo/bar/baz/")
-    parse("foo//bar//")
-    parse("")
-    parse("foo/bar")
-    parse("/foo/bar")
-    norm("foo/../bar/./baz")
-    norm("foo/../bar/./../baz")
-    norm("foo/../bar/./../../baz")
-    norm("/foo/../bar/./../../baz")
-    norm("../../../")
-    norm("/../../../")
-    norm("")
-    norm("foo")
-    println("--- resolve ---")
-    resolve("foo/bar", "baz")
-    resolve("foo/bar", "/baz")
-    resolve("foo/bar", "../baz")
-    println("--- parent ---")
-    val p = Path("/foo/bar/../baz/.///../yaz/")
-    println(p.normalize)
-    println(p.parts)
-    println(p.parent)
-    try {
-      val a = Path("/bar")
-      println(a.parts + ", " + a.parts.size)
-      println(a.parent)
-    } catch {
-      case e: NoSuchElementException => println("yikes!")
+  private def parse(path: String): Seq[String] = {
+    compress(path) match {
+      case "" => Seq()
+      case "/" => Seq("")
+      case p => p split '/'
     }
-  }
-
-  private def fix(path: String) {
-    println(path + " --> " + Path(path))
-  }
-
-  private def parse(path: String) {
-    val parts = Path(path).parts
-    println(path + " ==> " + parts + ", size=" + parts.size)
-  }
-
-  private def norm(path: String) {
-    println(path + " ~~> " + Path(path).normalize)
-  }
-
-  private def resolve(a: String, b: String) {
-    println(a + " + " + b + " --> " + Path(a).resolve(b))
   }
 }
