@@ -23,10 +23,10 @@ object Path {
 
   private class Impl(path: String) extends Path {
     lazy val parent: Path = {
-      parts match {
-        case Seq() => throw new NoSuchElementException("no parent node")
-        case _ => Path(parts dropRight 1)
-      }
+      if (parts.size > 1)
+        Path(parts dropRight 1)
+      else
+        throw new NoSuchElementException("no parent node")
     }
 
     lazy val parts: Seq[String] = parse(path)
@@ -110,6 +110,18 @@ object PathTest {
     resolve("foo/bar", "baz")
     resolve("foo/bar", "/baz")
     resolve("foo/bar", "../baz")
+    println("--- parent ---")
+    val p = Path("/foo/bar/../baz/.///../yaz/")
+    println(p.normalize)
+    println(p.parts)
+    println(p.parent)
+    try {
+      val a = Path("/bar")
+      println(a.parts + ", " + a.parts.size)
+      println(a.parent)
+    } catch {
+      case e: NoSuchElementException => println("yikes!")
+    }
   }
 
   private def fix(path: String) {
