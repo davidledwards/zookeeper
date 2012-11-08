@@ -103,4 +103,21 @@ class PathTest extends FunSuite {
       case (p) => intercept[NoSuchElementException] { Path(p).parent }
     }
   }
+
+  test("parent of path as option") {
+    val testsOk = Seq(
+          ("foo/bar", "foo"),
+          ("/foo", "/"),
+          ("/foo/bar", "/foo"))
+
+    testsOk foreach {
+      case (p, e) => assert(Path(p).parentOption.get.path === e)
+    }
+
+    val testsError = Seq("", "/", "foo")
+
+    testsError foreach {
+      case (p) => assert(Path(p).parentOption === None)
+    }
+  }
 }

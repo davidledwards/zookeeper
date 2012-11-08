@@ -8,6 +8,7 @@ import scala.collection.immutable.Stack
 trait Path {
   def path: String
   def parent: Path
+  def parentOption: Option[Path]
   def parts: Seq[String]
   def resolve(path: String): Path
   def resolve(path: Path): Path
@@ -20,20 +21,29 @@ object Path {
     new Impl(compress(path))
   }
 
+  def unapply(path: Path): Option[String] = {
+    if (path == null) None else Some(path.path)
+  }
+
   private def apply(parts: Seq[String]): Path = {
     new Impl(parts mkString "/")
   }
 
   private class Impl(val path: String) extends Path {
-    lazy val parent: Path = {
+    lazy val parent: Path = parentOption match {
+      case Some(p) => p
+      case _ => throw new NoSuchElementException("no parent node")
+    }
+
+    lazy val parentOption: Option[Path] = {
       if (parts.size > 1) {
         val _parts = parts dropRight 1
-        Path(_parts.last match {
+        Some(Path(_parts.last match {
           case "" => "/"
           case _ => _parts mkString "/"
-        })
+        }))
       } else
-        throw new NoSuchElementException("no parent node")
+        None
     }
 
     lazy val parts: Seq[String] = parse(path)
@@ -49,7 +59,7 @@ object Path {
 
     def resolve(path: Path): Path = resolve(path.path)
 
-    def normalize: Path = {
+    lazy val normalize: Path = {
       @tailrec def reduce(parts: Seq[String], stack: Stack[String]): Stack[String] = {
         parts.headOption match {
           case Some(part) =>
