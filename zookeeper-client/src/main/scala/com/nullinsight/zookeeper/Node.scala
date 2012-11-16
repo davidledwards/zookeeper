@@ -22,6 +22,9 @@ object Node {
 
   def apply(path: Path)(implicit zk: Zookeeper): Node = new Impl(zk.sync, path.normalize)
 
+  def unapply(node: Node): Option[Path] =
+    if (node == null) None else Some(node.path)
+
   private class Impl(zk: SynchronousZookeeper, val path: Path) extends Node {
     private implicit val _zk = zk
 

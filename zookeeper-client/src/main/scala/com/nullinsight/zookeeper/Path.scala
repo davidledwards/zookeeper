@@ -12,6 +12,8 @@ trait Path {
   def parts: Seq[String]
   def resolve(path: String): Path
   def resolve(path: Path): Path
+  def +(path: String): Path
+  def +(path: Path): Path
   def normalize: Path
   def isAbsolute: Boolean
 }
@@ -58,6 +60,10 @@ object Path {
     }
 
     def resolve(path: Path): Path = resolve(path.path)
+
+    def +(path: String): Path = resolve(path)
+
+    def +(path: Path): Path = resolve(path)
 
     lazy val normalize: Path = {
       @tailrec def reduce(parts: Seq[String], stack: Stack[String]): Stack[String] = {

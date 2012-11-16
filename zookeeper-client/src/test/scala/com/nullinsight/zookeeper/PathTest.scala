@@ -75,6 +75,24 @@ class PathTest extends FunSuite {
     }
   }
 
+  test("path resolution using + operator") {
+    val tests = Seq(
+          ("", "", ""),
+          ("", "/", "/"),
+          ("/", "", "/"),
+          ("foo", "", "foo"),
+          ("", "foo", "foo"),
+          ("foo", "bar", "foo/bar"),
+          ("foo", "/bar", "/bar"),
+          ("/foo", "", "/foo"),
+          ("/foo", "bar", "/foo/bar"),
+          ("/foo", "/bar", "/bar"))
+
+    tests foreach {
+      case (l, r, e) => assert((Path(l) + r).path === e)
+    }
+  }
+
   test("absolute/relative paths") {
     val tests = Seq(
           ("", false),
