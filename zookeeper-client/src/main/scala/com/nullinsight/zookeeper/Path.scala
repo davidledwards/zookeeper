@@ -85,6 +85,13 @@ object Path {
     lazy val isAbsolute: Boolean = path.headOption == Some('/')
 
     override def toString: String = path
+
+    override def equals(that: Any): Boolean = that match {
+      case _that: Path => _that.path == path
+      case _ => false
+    }
+
+    override def hashCode: Int = path.hashCode
   }
 
   private def compress(path: String): String = {
