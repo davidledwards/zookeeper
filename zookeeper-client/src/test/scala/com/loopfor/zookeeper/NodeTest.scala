@@ -1,7 +1,7 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
-import scala.language._
 import java.util.UUID
+import scala.language._
 
 class NodeTest extends ZookeeperSuite {
   test("normalized path when constructing node") { root =>

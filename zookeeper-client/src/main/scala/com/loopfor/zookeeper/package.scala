@@ -1,7 +1,7 @@
-package com.nullinsight
+package com.loopfor
 
-import org.apache.zookeeper.KeeperException
 import java.net.InetSocketAddress
+import org.apache.zookeeper.KeeperException
 import scala.language._
 
 /**

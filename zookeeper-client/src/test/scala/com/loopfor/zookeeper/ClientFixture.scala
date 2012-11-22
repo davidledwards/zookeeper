@@ -1,4 +1,4 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import scala.language._
 

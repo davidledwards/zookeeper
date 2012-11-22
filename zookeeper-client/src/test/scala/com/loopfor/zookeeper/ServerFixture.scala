@@ -1,4 +1,4 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import java.io.File
 import java.net.InetSocketAddress

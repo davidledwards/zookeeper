@@ -1,7 +1,7 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
-import org.scalatest.FunSuite
 import org.apache.zookeeper.Watcher.Event.{EventType, KeeperState}
+import org.scalatest.FunSuite
 
 class EventTest extends FunSuite {
   val PATH = "/test"

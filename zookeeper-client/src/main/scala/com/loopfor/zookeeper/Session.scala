@@ -1,4 +1,4 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import org.apache.zookeeper.ZooKeeper
 import scala.concurrent.duration._

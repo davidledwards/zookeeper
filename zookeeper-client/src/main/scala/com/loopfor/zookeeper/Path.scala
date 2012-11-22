@@ -1,9 +1,9 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import scala.annotation.tailrec
+import scala.collection.immutable.Stack
 import scala.collection.mutable.StringBuilder
 import scala.language._
-import scala.collection.immutable.Stack
 
 trait Path {
   def path: String

@@ -1,7 +1,7 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
+import org.apache.zookeeper.ZooDefs.{Ids, Perms}
 import org.apache.zookeeper.data.{ACL => ZACL, Id => ZId}
-import org.apache.zookeeper.ZooDefs._
 import scala.collection.JavaConverters._
 import scala.language._
 

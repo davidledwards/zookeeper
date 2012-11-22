@@ -1,6 +1,6 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
-import com.nullinsight.zookeeper.ACL._
+import com.loopfor.zookeeper.ACL._
 import org.scalatest.FunSuite
 import scala.language._
 

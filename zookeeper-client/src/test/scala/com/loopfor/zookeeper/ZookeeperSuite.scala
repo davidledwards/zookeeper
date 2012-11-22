@@ -1,4 +1,4 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import org.apache.zookeeper.server.ZooKeeperServer
 import org.scalatest.BeforeAndAfterAll

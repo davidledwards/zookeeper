@@ -1,4 +1,4 @@
-package com.nullinsight.zookeeper
+package com.loopfor.zookeeper
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.TimeUnit.NANOSECONDS
