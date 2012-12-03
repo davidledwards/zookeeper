@@ -89,7 +89,7 @@ class PathTest extends FunSuite {
           ("/foo", "/bar", "/bar"))
 
     tests foreach {
-      case (l, r, e) => assert((Path(l) + r).path === e)
+      case (l, r, e) => assert((Path(l).resolve(r)).path === e)
     }
   }
 

@@ -3,10 +3,10 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.loopfor.zookeeper</groupId>
-	<artifactId>zookeeper-client</artifactId>
+	<artifactId>zookeeper-cli</artifactId>
 	<version>1.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>zookeeper-client</name>
+	<name>zookeeper-cli</name>
 	<inceptionYear>2012</inceptionYear>
 	<properties>
 		<scala.version>2.10.0-RC3</scala.version>
@@ -32,22 +32,16 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>org.apache.zookeeper</groupId>
-			<artifactId>zookeeper</artifactId>
-			<version>3.4.3</version>
+			<groupId>com.loopfor.zookeeper</groupId>
+			<artifactId>zookeeper-client</artifactId>
+			<version>1.0-SNAPSHOT</version>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.16</version>
+			<groupId>jline</groupId>
+			<artifactId>jline</artifactId>
+			<version>2.9</version>
 			<scope>compile</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>javax.jms</groupId>
-					<artifactId>jms</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.scalatest</groupId>
@@ -125,16 +119,41 @@
 					</sourceIncludes>
 				</configuration>
 			</plugin>
-		</plugins>
-	</build>
-
-	<reporting>
-		<plugins>
 			<plugin>
-				<groupId>org.scala-tools</groupId>
-				<artifactId>maven-scala-plugin</artifactId>
-				<version>2.15.2</version>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>2.1</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+							<includeScope>runtime</includeScope>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2.1</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<descriptors>
+						<descriptor>src/main/assembly/bin.xml</descriptor>
+					</descriptors>
+				</configuration>
 			</plugin>
 		</plugins>
-	</reporting>
+	</build>
 </project>

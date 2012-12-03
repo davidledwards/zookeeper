@@ -69,13 +69,3 @@ object Node {
       zk.setACL(path.path, acl, version)
   }
 }
-
-object NodeExamples {
-  def main(args: Array[String]) {
-    val config = Configuration(("localhost", 2181) :: Nil)
-    implicit val zk = SynchronousZookeeper(config)
-    val node = Node("/foobar").create(Array(), ACL.EveryoneAll, EphemeralSequential)
-    println(node.path)
-    zk.close()
-  }
-}
