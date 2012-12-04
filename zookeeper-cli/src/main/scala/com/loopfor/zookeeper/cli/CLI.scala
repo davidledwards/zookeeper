@@ -109,6 +109,7 @@ options:
     val zk = Zookeeper(config)
 
     val commands = Map[String, Command](
+          "config" -> ConfigCommand(config),
           "cd" -> CdCommand(zk),
           "pwd" -> PwdCommand(zk),
           "ls" -> LsCommand(zk),
@@ -123,7 +124,19 @@ options:
     @tailrec def process(context: Path) {
       if (context != null) {
         val args = readCommand(reader)
-        val _context = if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
+        val _context = try {
+          if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
+        } catch {
+          case _: ConnectionLossException =>
+            println("connection lost")
+            context
+          case _: SessionExpiredException =>
+            println("session has expired; `quit` and restart program")
+            context
+          case e: KeeperException =>
+            println("internal zookeeper error: " + e.getMessage)
+            context
+        }
         process(_context)
       }
     }
@@ -134,7 +147,7 @@ options:
 
   private def readCommand(reader: ConsoleReader): Array[String] = {
     val line = reader.readLine("zk> ")
-    val args = line split ' '
+    val args = if (line == null) Array("quit") else line split ' '
     args.headOption match {
       case Some(a) => if (a == "") args.tail else args
       case _ => args
@@ -189,6 +202,17 @@ options:
 }
 
 trait Command extends ((String, Seq[String], Path) => Path)
+
+private object ConfigCommand {
+  def apply(config: Configuration) = new Command {
+    def apply(cmd: String, args: Seq[String], context: Path) = {
+      println("servers: " + (config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","))
+      println("path: " + Path("/").resolve(config.path).normalize)
+      println("timeout: " + config.timeout)
+      context
+    }
+  }
+}
 
 private object LsCommand {
   def apply(zk: Zookeeper) = new Command {
@@ -298,7 +322,7 @@ private object GetCommand {
           print((for (i <- n until (n + l)) yield "%02x " format data(i)).mkString)
           print((for (i <- l until 16) yield "   ").mkString)
           print(" |")
-          print((for (i <- n until (n + l)) yield ".").mkString)
+          print((for (i <- n until (n + l)) yield charOf(data(i))).mkString)
           print((for (i <- l until 16) yield " ").mkString)
           println("|")
           display(n + l)
@@ -306,6 +330,8 @@ private object GetCommand {
       }
       display(0)
     }
+
+    private def charOf(b: Byte): Char = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
   }
 }
 
