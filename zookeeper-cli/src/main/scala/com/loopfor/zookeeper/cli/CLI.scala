@@ -113,6 +113,7 @@ options:
           "pwd" -> PwdCommand(zk),
           "ls" -> LsCommand(zk),
           "stat" -> StatCommand(zk),
+          "get" -> GetCommand(zk),
           "quit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
 
     val reader = new ConsoleReader
@@ -264,6 +265,46 @@ private object StatCommand {
         i + 1
       }
       context
+    }
+  }
+}
+
+private object GetCommand {
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
+    def apply(cmd: String, args: Seq[String], context: Path): Path = {
+      val paths = if (args.isEmpty) args :+ "" else args
+      val count = paths.size
+      (1 /: paths) { case (i, path) =>
+        val node = Node(context resolve path)
+        try {
+          val (data, status) = node.get()
+          display(data)
+        } catch {
+          case _: NoNodeException => println(node.path + ": no such node")
+        }
+        i + 1
+      }
+      context
+    }
+
+    private def display(data: Array[Byte]) {
+      @tailrec def display(n: Int) {
+        import Math.min
+        if (n < data.length) {
+          val l = min(n + 16, data.length) - n
+          print("%08x  " format n)
+          print((for (i <- n until (n + l)) yield "%02x " format data(i)).mkString)
+          print((for (i <- l until 16) yield "   ").mkString)
+          print(" |")
+          print((for (i <- n until (n + l)) yield ".").mkString)
+          print((for (i <- l until 16) yield " ").mkString)
+          println("|")
+          display(n + l)
+        }
+      }
+      display(0)
     }
   }
 }
