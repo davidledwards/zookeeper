@@ -29,6 +29,31 @@ class NodeTest extends ZookeeperSuite {
     }
   }
 
+  test("path name") { root =>
+    val tests = Seq(
+          ("", ""),
+          ("/", ""),
+          ("..", ".."),
+          ("/..", ""),
+          ("/../..", ""),
+          ("foo", "foo"),
+          ("foo/.", "foo"),
+          ("foo/..", ""),
+          ("./foo", "foo"),
+          ("../foo", "foo"),
+          ("foo/../bar", "bar"),
+          ("foo/./bar/../baz/.", "baz"),
+          ("foo/../../bar", "bar"),
+          ("/foo/./bar/../baz", "baz"),
+          ("/foo/..", ""),
+          ("/foo/../..", ""),
+          ("/foo/../../bar", "bar"))
+
+    tests foreach {
+      case (p, e) => println(Node(p).name); assert(Node(p).name === e)
+    }
+  }
+
   test("create persistent node") { root =>
     val path = root + "foo"
     val node = Node(path).create(Array(), ACL.EveryoneAll, Persistent)

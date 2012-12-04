@@ -1,6 +1,7 @@
 package com.loopfor.zookeeper
 
 trait Node {
+  def name: String
   def path: Path
   def parent: Node
   def parentOption: Option[Node]
@@ -27,6 +28,11 @@ object Node {
 
   private class Impl(zk: SynchronousZookeeper, val path: Path) extends Node {
     private implicit val _zk = zk
+
+    lazy val name: String = path.parts.lastOption match {
+      case Some(p) => p
+      case _ => ""
+    }
 
     lazy val parent: Node = Node(path.parent)
 
@@ -57,10 +63,10 @@ object Node {
       zk.watch(fn).exists(path.path)
 
     def children(): Seq[Node] =
-      zk.children(path.path) map { Node(_) }
+      zk.children(path.path) map { c => Node(path resolve c) }
 
     def children(fn: PartialFunction[Event, Unit]): Seq[Node] =
-      zk.watch(fn).children(path.path) map { Node(_) }
+      zk.watch(fn).children(path.path) map { c => Node(path resolve c) }
 
     def getACL(): (Seq[ACL], Status) =
       zk.getACL(path.path)

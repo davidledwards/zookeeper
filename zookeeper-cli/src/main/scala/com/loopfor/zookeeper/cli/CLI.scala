@@ -115,7 +115,9 @@ options:
           "ls" -> LsCommand(zk),
           "stat" -> StatCommand(zk),
           "get" -> GetCommand(zk),
-          "quit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
+          "getacl" -> GetACLCommand(zk),
+          "quit" -> QuitCommand(zk),
+          "exit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
 
     val reader = new ConsoleReader
     reader.setBellEnabled(false)
@@ -154,10 +156,6 @@ options:
     }
   }
 
-  private class OptionException(message: String, cause: Throwable) extends Exception(message, cause) {
-    def this(message: String) = this(message, null)
-  }
-
   private def parseOptions(args: Array[String]): Map[Symbol, Any] = {
     @tailrec def parse(args: Stream[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
       if (args.isEmpty)
@@ -189,19 +187,23 @@ options:
       }
     }
 
-    object LongOption {
-      def unapply(arg: String): Option[String] = if (arg startsWith "--") Some(arg drop 2) else None
-    }
-
-    object ShortOption {
-      def unapply(arg: String): Option[String] = if (arg startsWith "-") Some(arg drop 1) else None
-    }
-
     parse(args.toStream, Map())
   }
 }
 
-trait Command extends ((String, Seq[String], Path) => Path)
+private object LongOption {
+  def unapply(arg: String): Option[String] = if (arg startsWith "--") Some(arg drop 2) else None
+}
+
+private object ShortOption {
+  def unapply(arg: String): Option[String] = if (arg startsWith "-") Some(arg drop 1) else None
+}
+
+private class OptionException(message: String, cause: Throwable) extends Exception(message, cause) {
+  def this(message: String) = this(message, null)
+}
+
+private trait Command extends ((String, Seq[String], Path) => Path)
 
 private object ConfigCommand {
   def apply(config: Configuration) = new Command {
@@ -219,15 +221,28 @@ private object LsCommand {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val paths = if (args.isEmpty) args :+ "" else args
+      val opts = try {
+        parse(args)
+      } catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val recurse = opts contains 'recursive
+      val paths = opts get 'params match {
+        case Some(p) => p.asInstanceOf[Seq[String]]
+        case None => Seq("")
+      }
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         try {
-          val children = node.children()
+          val children = node.children() sortBy { _.name }
           if (count > 1)
             println(node.path + ":")
-          children foreach { child => println(child.path.parts.last) }
+          if (recurse)
+            traverse(children, 0)
+          else
+            children foreach { child => println(child.name) }
           if (count > 1 && i < count)
             println()
         } catch {
@@ -237,6 +252,39 @@ private object LsCommand {
       }
       context
     }
+  }
+
+  private def traverse(children: Seq[Node], depth: Int) {
+    children foreach { child =>
+      if (depth > 0)
+        print(pad(depth) + "+ ")
+      println(child.name)
+      try {
+        traverse(child.children() sortBy { _.name }, depth + 1)
+      } catch {
+        case _: NoNodeException => // just ignore nodes that disappear during traversal
+      }
+    }
+  }
+
+  private def pad(depth: Int) = (0 until (depth - 1) * 2) map { _ => ' ' } mkString
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map())
   }
 }
 
@@ -304,7 +352,11 @@ private object GetCommand {
         val node = Node(context resolve path)
         try {
           val (data, status) = node.get()
+          if (count > 1)
+            println(node.path + ":")
           display(data)
+          if (count > 1 && i < count)
+            println()
         } catch {
           case _: NoNodeException => println(node.path + ": no such node")
         }
@@ -312,26 +364,66 @@ private object GetCommand {
       }
       context
     }
+  }
 
-    private def display(data: Array[Byte]) {
-      @tailrec def display(n: Int) {
-        import Math.min
-        if (n < data.length) {
-          val l = min(n + 16, data.length) - n
-          print("%08x  " format n)
-          print((for (i <- n until (n + l)) yield "%02x " format data(i)).mkString)
-          print((for (i <- l until 16) yield "   ").mkString)
-          print(" |")
-          print((for (i <- n until (n + l)) yield charOf(data(i))).mkString)
-          print((for (i <- l until 16) yield " ").mkString)
-          println("|")
-          display(n + l)
-        }
+  private def display(data: Array[Byte]) {
+    @tailrec def display(n: Int) {
+      if (n < data.length) {
+        val l = Math.min(n + 16, data.length) - n
+        print("%08x  " format n)
+        print((for (i <- n until (n + l)) yield "%02x " format data(i)).mkString)
+        print(pad((16 - l) * 3))
+        print(" |")
+        print((for (i <- n until (n + l)) yield charOf(data(i))).mkString)
+        print(pad(16 - l))
+        println("|")
+        display(n + l)
       }
-      display(0)
     }
+    display(0)
+  }
 
-    private def charOf(b: Byte): Char = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
+  private def pad(n: Int): String = (0 until n) map { _ => ' ' } mkString
+
+  private def charOf(b: Byte): Char = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
+}
+
+private object GetACLCommand {
+  def apply(zk: Zookeeper) = new Command {
+    implicit private val _zk = zk
+
+    def apply(cmd: String, args: Seq[String], context: Path): Path = {
+      val paths = if (args.isEmpty) args :+ "" else args
+      val count = paths.size
+      (1 /: paths) { case (i, path) =>
+        val node = Node(context resolve path)
+        try {
+          val (acl, status) = node.getACL()
+          if (count > 1)
+            println(node.path + ":")
+          display(acl)
+          if (count > 1 && i < count)
+            println()
+        } catch {
+          case _: NoNodeException => println(node.path + ": no such node")
+        }
+        i + 1
+      }
+      context
+    }
+  }
+
+  private def display(acl: Seq[ACL]) {
+    acl foreach { a =>
+      print(a.id.scheme + ":" + a.id.id + "=")
+      val p = a.permission
+      print(if ((p & ACL.Read) == 0) "-" else "r")
+      print(if ((p & ACL.Write) == 0) "-" else "w")
+      print(if ((p & ACL.Create) == 0) "-" else "c")
+      print(if ((p & ACL.Delete) == 0) "-" else "d")
+      print(if ((p & ACL.Admin) == 0) "-" else "a")
+      println()
+    }
   }
 }
 
