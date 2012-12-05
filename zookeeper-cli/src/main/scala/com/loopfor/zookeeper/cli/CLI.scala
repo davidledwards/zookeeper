@@ -125,20 +125,37 @@ options:
           "quit" -> QuitCommand(zk),
           "exit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
 
-    def reader(context: Path): ConsoleReader = {
-      import ArgumentCompleter._
-      val completer = new ArgumentCompleter(new WhitespaceArgumentDelimiter(),
-            new StringsCompleter(commands.keySet.asJava), new PathCompleter(zk, context))
-      completer.setStrict(false)
-      val reader = new ConsoleReader
+    object Reader {
+      private val reader = new ConsoleReader
       reader.setBellEnabled(false)
-      reader.addCompleter(completer)
-      reader
+      reader.setHistoryEnabled(true)
+      reader.setPrompt("zk> ")
+
+      private val delimiter = new ArgumentCompleter.WhitespaceArgumentDelimiter()
+      private val first = new StringsCompleter(commands.keySet.asJava)
+
+      def apply(context: Path): Array[String] = {
+        // Completer is added and removed with each invocation since completion is relative to the path context and the
+        // context may change with each subsequent command. Keeping the same reader for the duration of the user session
+        // is necessary to retain command history, otherwise ^p/^n operations have no effect.
+        val completer = new ArgumentCompleter(delimiter, first, new PathCompleter(zk, context))
+        reader.addCompleter(completer)
+        try {
+          val line = reader.readLine()
+          val args = if (line == null) Array("quit") else line split ' '
+          args.headOption match {
+            case Some(a) => if (a == "") args.tail else args
+            case _ => args
+          }
+        } finally {
+          reader.removeCompleter(completer)
+        }
+      }
     }
 
     @tailrec def process(context: Path) {
       if (context != null) {
-        val args = readCommand(reader(context))
+        val args = Reader(context)
         val _context = try {
           if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
         } catch {
@@ -164,18 +181,30 @@ options:
     private implicit val _zk = zk
 
     def complete(buffer: String, cursor: Int, candidates: java.util.List[CharSequence]): Int = {
-      val buf = if (buffer == null) "" else buffer
-      val path = context resolve buf
-      val node = Node(if (buf endsWith "/") path else path.parentOption match {
-        case Some(p) => p
-        case _ => path
-      })
-      val prefix = if (buf endsWith "/") "" else path.name
+      val (node, prefix) = if (buffer == null)
+        (Node(context), "")
+      else {
+        val path = context resolve buffer
+        if (buffer endsWith "/") (Node(path), "")
+        else (Node(path.parentOption match {
+          case Some(p) => p
+          case _ => path
+        }), path.name)
+      }
+      if (prefix == "." || prefix == "..") {
+        candidates add "/"
+        buffer.size
+      } else {
       try {
-        node.children() filter { _.name startsWith prefix } foreach { candidates add _.name }
-        (buf lastIndexOf '/') + 1
+        val results = node.children() filter { _.name startsWith prefix }
+        if (results.size == 1 && results.head.name == prefix)
+          candidates add results.head.name + "/"
+        else
+          results sortBy { _.name } foreach { candidates add _.name }
+        if (buffer == null) 0 else (buffer lastIndexOf '/') + 1
       } catch {
         case _: KeeperException => return -1
+      }
       }
     }
   }
