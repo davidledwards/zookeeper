@@ -116,6 +116,10 @@ options:
           "stat" -> StatCommand(zk),
           "get" -> GetCommand(zk),
           "getacl" -> GetACLCommand(zk),
+          "mk" -> CreateCommand(zk),
+          "create" -> CreateCommand(zk),
+          "rm" -> DeleteCommand(zk),
+          "del" -> DeleteCommand(zk),
           "quit" -> QuitCommand(zk),
           "exit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
 
@@ -175,7 +179,7 @@ options:
               val _seconds = try {
                 seconds.toInt
               } catch {
-                case e: NumberFormatException => throw new OptionException(seconds + ": SECONDS must be an integer")
+                case _: NumberFormatException => throw new OptionException(seconds + ": SECONDS must be an integer")
               }
               parse(rest.tail, opts + ('timeout -> _seconds))
             case _ => throw new OptionException(arg + ": missing argument")
@@ -424,6 +428,131 @@ private object GetACLCommand {
       print(if ((p & ACL.Admin) == 0) "-" else "a")
       println()
     }
+  }
+}
+
+private object CreateCommand {
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
+    def apply(cmd: String, args: Seq[String], context: Path): Path = {
+      val opts = try {
+        parse(args)
+      } catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val recurse = opts('recursive).asInstanceOf[Boolean]
+      val disp = disposition(opts)
+      val path = opts('params).asInstanceOf[Seq[String]].head
+      val node = Node(context resolve path)
+      try {
+        node.create(Array(), ACL.EveryoneAll, disp)
+      } catch {
+        case e: NodeExistsException => println(Path(e.getPath).normalize + ": node already exists")
+        case _: NoNodeException => println(node.parent.path + ": no such parent node")
+        case _: NoChildrenForEphemeralsException => println(node.parent.path + ": parent node is ephemeral")
+      }
+      context
+    }
+  }
+
+  private def disposition(opts: Map[Symbol, Any]): Disposition = {
+    val sequential = opts('sequential).asInstanceOf[Boolean]
+    val ephemeral = opts('ephemeral).asInstanceOf[Boolean]
+    if (sequential && ephemeral) EphemeralSequential
+    else if (sequential) PersistentSequential
+    else if (ephemeral) Ephemeral
+    else Persistent
+  }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
+          case LongOption("sequential") | ShortOption("s") => parse(rest, opts + ('sequential -> true))
+          case LongOption("ephemeral") | ShortOption("e") => parse(rest, opts + ('ephemeral -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'recursive -> false,
+          'sequential -> false,
+          'ephemeral -> false,
+          'params -> Seq("")))
+  }
+}
+
+private object DeleteCommand {
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
+    def apply(cmd: String, args: Seq[String], context: Path): Path = {
+      val opts = try {
+        parse(args)
+      } catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val recurse = opts('recursive).asInstanceOf[Boolean]
+      val force = opts('force).asInstanceOf[Boolean]
+      val version = opts('version).asInstanceOf[Option[Int]]
+      val path = opts('params).asInstanceOf[Seq[String]].head
+      if (!force && version.isEmpty) {
+        println("version must be specified; otherwise use --force")
+        return context
+      }
+      val node = Node(context resolve path)
+      try {
+        node.delete(if (force) None else version)
+      } catch {
+        case _: NoNodeException => println(node.path + ": no such node")
+        case _: BadVersionException => println(version.get + ": version does not match")
+        case _: NotEmptyException => println(node.path + ": node has children")
+      }
+      context
+    }
+  }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
+          case LongOption("force") | ShortOption("f") => parse(rest, opts + ('force -> true))
+          case LongOption("version") | ShortOption("v") => rest.headOption match {
+            case Some(version) =>
+              val _version = try {
+                version.toInt
+              } catch {
+                case _: NumberFormatException => throw new OptionException(version + ": VERSION must be an integer")
+              }
+              parse(rest.tail, opts + ('version -> Some(_version)))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'recursive -> false,
+          'force -> false,
+          'version -> None,
+          'params -> Seq("")))
   }
 }
 
