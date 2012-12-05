@@ -29,10 +29,7 @@ object Node {
   private class Impl(zk: SynchronousZookeeper, val path: Path) extends Node {
     private implicit val _zk = zk
 
-    lazy val name: String = path.parts.lastOption match {
-      case Some(p) => p
-      case _ => ""
-    }
+    lazy val name: String = path.name
 
     lazy val parent: Node = Node(path.parent)
 

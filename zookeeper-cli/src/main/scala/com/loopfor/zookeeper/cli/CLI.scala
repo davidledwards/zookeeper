@@ -14,6 +14,8 @@ import com.loopfor.zookeeper.Path
 import com.loopfor.zookeeper._
 import java.text.DateFormat
 import java.util.Date
+import jline.console.completer.Completer
+import jline.console.completer.ArgumentCompleter
 
 object CLI {
   def main(args: Array[String]) {
@@ -123,13 +125,20 @@ options:
           "quit" -> QuitCommand(zk),
           "exit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
 
-    val reader = new ConsoleReader
-    reader.setBellEnabled(false)
-    reader.addCompleter(new StringsCompleter(commands.keySet.asJava))
+    def reader(context: Path): ConsoleReader = {
+      import ArgumentCompleter._
+      val completer = new ArgumentCompleter(new WhitespaceArgumentDelimiter(),
+            new StringsCompleter(commands.keySet.asJava), new PathCompleter(zk, context))
+      completer.setStrict(false)
+      val reader = new ConsoleReader
+      reader.setBellEnabled(false)
+      reader.addCompleter(completer)
+      reader
+    }
 
     @tailrec def process(context: Path) {
       if (context != null) {
-        val args = readCommand(reader)
+        val args = readCommand(reader(context))
         val _context = try {
           if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
         } catch {
@@ -149,6 +158,26 @@ options:
 
     process(Path("/"))
     0
+  }
+
+  private class PathCompleter(zk: Zookeeper, context: Path) extends Completer {
+    private implicit val _zk = zk
+
+    def complete(buffer: String, cursor: Int, candidates: java.util.List[CharSequence]): Int = {
+      val buf = if (buffer == null) "" else buffer
+      val path = context resolve buf
+      val node = Node(if (buf endsWith "/") path else path.parentOption match {
+        case Some(p) => p
+        case _ => path
+      })
+      val prefix = if (buf endsWith "/") "" else path.name
+      try {
+        node.children() filter { _.name startsWith prefix } foreach { candidates add _.name }
+        (buf lastIndexOf '/') + 1
+      } catch {
+        case _: KeeperException => return -1
+      }
+    }
   }
 
   private def readCommand(reader: ConsoleReader): Array[String] = {

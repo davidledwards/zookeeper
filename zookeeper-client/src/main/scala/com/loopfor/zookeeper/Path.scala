@@ -6,6 +6,7 @@ import scala.collection.mutable.StringBuilder
 import scala.language._
 
 trait Path {
+  def name: String
   def path: String
   def parent: Path
   def parentOption: Option[Path]
@@ -30,6 +31,11 @@ object Path {
   }
 
   private class Impl(val path: String) extends Path {
+    lazy val name: String = parts.lastOption match {
+      case Some(p) => p
+      case _ => ""
+    }
+
     lazy val parent: Path = parentOption match {
       case Some(p) => p
       case _ => throw new NoSuchElementException("no parent node")
