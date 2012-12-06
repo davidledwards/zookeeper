@@ -16,6 +16,8 @@ import java.text.DateFormat
 import java.util.Date
 import jline.console.completer.Completer
 import jline.console.completer.ArgumentCompleter
+import java.util.concurrent.atomic.AtomicReference
+import java.io.IOException
 
 object CLI {
   def main(args: Array[String]) {
@@ -32,8 +34,7 @@ object CLI {
     }
   }
 
-  private val USAGE = """
-usage: zk [OPTIONS] SERVER...
+  private val Usage = """usage: zk OPTIONS SERVER...
        zk [-? | --help]
 
   An interactive client capable of connecting to a ZooKeeper cluster. At least
@@ -50,12 +51,10 @@ options:
   private def run(args: Array[String]): Int = {
     import Console.err
     if (args.size == 0) {
-      println(USAGE)
+      println(Usage)
       return 1
     }
-    val opts = try {
-      parseOptions(args)
-    } catch {
+    val opts = try parse(args) catch {
       case e: OptionException =>
         err.println(e.getMessage)
         return 1
@@ -65,56 +64,53 @@ options:
         e.printStackTrace(err)
         return 1
     }
-    if (opts contains 'help) {
-      println(USAGE)
+    if (opts('help).asInstanceOf[Boolean]) {
+      println(Usage)
       return 0
     }
-    val servers = opts get 'params match {
-      case Some(params) =>
-        params.asInstanceOf[Seq[String]] map { p =>
-          val i = p indexOf ':'
-          if (i == -1) {
-            println(p + ": missing port; expecting `host:port`")
+    val params = opts('params).asInstanceOf[Seq[String]]
+    if (params.isEmpty) {
+      println("no servers specified")
+      return 1
+    }
+    val servers = params map { server =>
+      val i = server indexOf ':'
+      if (i == -1) {
+        println(server + ": missing port; expecting `host:port`")
+        return 1
+      } else if (i == 0) {
+        println(server + ": missing host; expecting `host:port`")
+        return 1
+      } else {
+        new InetSocketAddress(server take i, try {
+          (server drop i + 1).toInt
+        } catch {
+          case _: NumberFormatException =>
+            println(server + ": port invalid; expecting `host:port`")
             return 1
-          } else if (i == 0) {
-            println(p + ": missing host; expecting `host:port`")
-            return 1
-          } else {
-            new InetSocketAddress(p take i, try {
-              (p drop i + 1).toInt
-            } catch {
-              case _: NumberFormatException =>
-                println(p + ": port invalid; expecting `host:port`")
-                return 1
-            })
-          }
-        }
-      case _ =>
-        println("no servers specified")
+        })
+      }
+    }
+    val path = opts('path).asInstanceOf[String]
+    val timeout = opts('timeout).asInstanceOf[Int] seconds
+    val readonly = opts('readonly).asInstanceOf[Boolean]
+
+    val state = new AtomicReference[StateEvent](Disconnected)
+    val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly) withWatcher {
+      (event, session) => state set event
+    }
+    val zk = try Zookeeper(config) catch {
+      case e: IOException =>
+        println("I/O error: " + e.getMessage)
         return 1
     }
-    val path = opts get 'path match {
-      case Some(p) => p.asInstanceOf[String]
-      case _ => ""
-    }
-    val timeout = opts get 'timeout match {
-      case Some(p) => p.asInstanceOf[Int] seconds
-      case _ => 60 seconds
-    }
-    val readonly = opts get 'readonly match {
-      case Some(p) => p.asInstanceOf[Boolean]
-      case _ => false
-    }
-
-    // todo: add watcher to config so we can change cursor when client state changes
-    val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly)
-    val zk = Zookeeper(config)
 
     val commands = Map[String, Command](
-          "config" -> ConfigCommand(config),
-          "cd" -> CdCommand(zk),
-          "pwd" -> PwdCommand(zk),
+          "config" -> ConfigCommand(config, state),
+          "cd" -> CdCommand(),
+          "pwd" -> PwdCommand(),
           "ls" -> LsCommand(zk),
+          "dir" -> LsCommand(zk),
           "stat" -> StatCommand(zk),
           "get" -> GetCommand(zk),
           "getacl" -> GetACLCommand(zk),
@@ -123,39 +119,20 @@ options:
           "rm" -> DeleteCommand(zk),
           "del" -> DeleteCommand(zk),
           "quit" -> QuitCommand(zk),
-          "exit" -> QuitCommand(zk)) withDefaultValue UnrecognizedCommand(zk)
-
-    object Reader {
-      private val reader = new ConsoleReader
-      reader.setBellEnabled(false)
-      reader.setHistoryEnabled(true)
-      reader.setPrompt("zk> ")
-
-      private val delimiter = new ArgumentCompleter.WhitespaceArgumentDelimiter()
-      private val first = new StringsCompleter(commands.keySet.asJava)
-
-      def apply(context: Path): Array[String] = {
-        // Completer is added and removed with each invocation since completion is relative to the path context and the
-        // context may change with each subsequent command. Keeping the same reader for the duration of the user session
-        // is necessary to retain command history, otherwise ^p/^n operations have no effect.
-        val completer = new ArgumentCompleter(delimiter, first, new PathCompleter(zk, context))
-        reader.addCompleter(completer)
-        try {
-          val line = reader.readLine()
-          val args = if (line == null) Array("quit") else line split ' '
-          args.headOption match {
-            case Some(a) => if (a == "") args.tail else args
-            case _ => args
-          }
-        } finally {
-          reader.removeCompleter(completer)
-        }
+          "exit" -> QuitCommand(zk),
+          "help" -> HelpCommand(),
+          "?" -> HelpCommand()) withDefaultValue new Command {
+      def apply(cmd: String, args: Seq[String], context: Path): Path = {
+        println(cmd + ": no such command")
+        context
       }
     }
 
+    val reader = Reader(commands.keySet, zk)
+
     @tailrec def process(context: Path) {
       if (context != null) {
-        val args = Reader(context)
+        val args = reader(context)
         val _context = try {
           if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
         } catch {
@@ -177,6 +154,73 @@ options:
     0
   }
 
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest.toList)
+          case LongOption("help") | ShortOption("?") => parse(rest, opts + ('help -> true))
+          case LongOption("path") | ShortOption("p") => rest.headOption match {
+            case Some(path) => parse(rest.tail, opts + ('path -> path))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("timeout") | ShortOption("t") => rest.headOption match {
+            case Some(seconds) =>
+              val _seconds = try seconds.toInt catch {
+                case _: NumberFormatException => throw new OptionException(seconds + ": timeout must be an integer")
+              }
+              parse(rest.tail, opts + ('timeout -> _seconds))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("readonly") | ShortOption("r") => parse(rest, opts + ('readonly -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case _ => opts + ('params -> args.toList)
+        }
+      }
+    }
+    parse(args, Map(
+          'help -> false,
+          'path -> "",
+          'timeout -> 60,
+          'readonly -> false,
+          'params -> Seq("")))
+  }
+}
+
+object Reader {
+  def apply(commands: Set[String], zk: Zookeeper) = new (Path => Seq[String]) {
+    private val reader = new ConsoleReader
+    reader.setBellEnabled(false)
+    reader.setHistoryEnabled(true)
+    reader.setPrompt("zk> ")
+
+    private val delimiter = new ArgumentCompleter.WhitespaceArgumentDelimiter()
+    private val first = new StringsCompleter(commands.asJava)
+
+    def apply(context: Path): Seq[String] = {
+      // Completer is added and removed with each invocation since completion is relative to the path context and the
+      // context may change with each subsequent command. Keeping the same reader for the duration of the user session
+      // is necessary to retain command history, otherwise ^p/^n operations have no effect.
+      val completer = new ArgumentCompleter(delimiter, first, new PathCompleter(zk, context))
+      completer.setStrict(false)
+      reader.addCompleter(completer)
+      try {
+        val line = reader.readLine()
+        val args = if (line == null) Array("quit") else line split ' '
+        args.headOption match {
+          case Some(a) => if (a == "") args.tail else args
+          case _ => args
+        }
+      } finally {
+        reader.removeCompleter(completer)
+      }
+    }
+  }
+
   private class PathCompleter(zk: Zookeeper, context: Path) extends Completer {
     private implicit val _zk = zk
 
@@ -195,105 +239,56 @@ options:
         candidates add "/"
         buffer.size
       } else {
-      try {
-        val results = node.children() filter { _.name startsWith prefix }
-        if (results.size == 1 && results.head.name == prefix)
-          candidates add results.head.name + "/"
-        else
-          results sortBy { _.name } foreach { candidates add _.name }
-        if (buffer == null) 0 else (buffer lastIndexOf '/') + 1
-      } catch {
-        case _: KeeperException => return -1
-      }
-      }
-    }
-  }
-
-  private def readCommand(reader: ConsoleReader): Array[String] = {
-    val line = reader.readLine("zk> ")
-    val args = if (line == null) Array("quit") else line split ' '
-    args.headOption match {
-      case Some(a) => if (a == "") args.tail else args
-      case _ => args
-    }
-  }
-
-  private def parseOptions(args: Array[String]): Map[Symbol, Any] = {
-    @tailrec def parse(args: Stream[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
-      if (args.isEmpty)
-        opts
-      else {
-        val arg = args.head
-        val rest = args.tail
-        arg match {
-          case "--" => opts + ('params -> rest.toList)
-          case LongOption("help") | ShortOption("?") => parse(rest, opts + ('help -> true))
-          case LongOption("path") | ShortOption("p") => rest.headOption match {
-            case Some(path) => parse(rest.tail, opts + ('path -> path))
-            case _ => throw new OptionException(arg + ": missing argument")
-          }
-          case LongOption("timeout") | ShortOption("t") => rest.headOption match {
-            case Some(seconds) =>
-              val _seconds = try {
-                seconds.toInt
-              } catch {
-                case _: NumberFormatException => throw new OptionException(seconds + ": SECONDS must be an integer")
-              }
-              parse(rest.tail, opts + ('timeout -> _seconds))
-            case _ => throw new OptionException(arg + ": missing argument")
-          }
-          case LongOption("readonly") | ShortOption("r") => parse(rest, opts + ('readonly -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
-          case _ => opts + ('params -> args.toList)
+        try {
+          val results = node.children() filter { _.name startsWith prefix }
+          if (results.size == 1 && results.head.name == prefix)
+            candidates add results.head.name + "/"
+          else
+            results sortBy { _.name } foreach { candidates add _.name }
+          if (buffer == null) 0 else (buffer lastIndexOf '/') + 1
+        } catch {
+          case _: KeeperException => return -1
         }
       }
     }
-
-    parse(args.toStream, Map())
   }
-}
-
-private object LongOption {
-  def unapply(arg: String): Option[String] = if (arg startsWith "--") Some(arg drop 2) else None
-}
-
-private object ShortOption {
-  def unapply(arg: String): Option[String] = if (arg startsWith "-") Some(arg drop 1) else None
-}
-
-private class OptionException(message: String, cause: Throwable) extends Exception(message, cause) {
-  def this(message: String) = this(message, null)
 }
 
 private trait Command extends ((String, Seq[String], Path) => Path)
 
 private object ConfigCommand {
-  def apply(config: Configuration) = new Command {
+  def apply(config: Configuration, state: AtomicReference[StateEvent]) = new Command {
     def apply(cmd: String, args: Seq[String], context: Path) = {
       println("servers: " + (config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","))
       println("path: " + Path("/").resolve(config.path).normalize)
       println("timeout: " + config.timeout)
+      println("session: " + state.get)
       context
     }
   }
 }
 
 private object LsCommand {
+  val Usage= """usage: ls OPTIONS PATH...
+       dir OPTIONS PATH...
+
+  List child nodes for each PATH. PATH may be omitted, in which case the
+  current working node is assumed.
+
+options:
+  --recursive, -r            : recursively list nodes
+"""
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try {
-        parse(args)
-      } catch {
+      val opts = try parse(args) catch {
         case e: OptionException => println(e.getMessage)
         return context
       }
-      val recurse = opts contains 'recursive
-      val paths = opts get 'params match {
-        case Some(p) => p.asInstanceOf[Seq[String]]
-        case None => Seq("")
-      }
+      val recurse = opts('recursive).asInstanceOf[Boolean]
+      val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
@@ -324,15 +319,13 @@ private object LsCommand {
       try {
         traverse(child.children() sortBy { _.name }, depth + 1)
       } catch {
-        case _: NoNodeException => // just ignore nodes that disappear during traversal
+        case _: NoNodeException => // ignore nodes that disappear during traversal
       }
     }
   }
 
-  private def pad(depth: Int) = (0 until (depth - 1) * 2) map { _ => ' ' } mkString
-
   private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
       if (args.isEmpty)
         opts
       else {
@@ -341,17 +334,21 @@ private object LsCommand {
         arg match {
           case "--" => opts + ('params -> rest)
           case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
     }
-    parse(args, Map())
+    parse(args, Map(
+          'recursive -> false,
+          'params -> Seq("")))
   }
+
+  private def pad(depth: Int) = Array.fill((depth - 1) * 2)(' ') mkString
 }
 
 private object CdCommand {
-  def apply(zk: Zookeeper) = new Command {
+  def apply() = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       if (args.isEmpty) Path("/") else context.resolve(args.head).normalize
     }
@@ -359,7 +356,7 @@ private object CdCommand {
 }
 
 private object PwdCommand {
-  def apply(zk: Zookeeper) = new Command {
+  def apply() = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       println(context.path)
       context
@@ -445,9 +442,9 @@ private object GetCommand {
     display(0)
   }
 
-  private def pad(n: Int): String = (0 until n) map { _ => ' ' } mkString
-
   private def charOf(b: Byte): Char = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
+
+  private def pad(n: Int): String = Array.fill(n)(' ') mkString
 }
 
 private object GetACLCommand {
@@ -494,9 +491,7 @@ private object CreateCommand {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try {
-        parse(args)
-      } catch {
+      val opts = try parse(args) catch {
         case e: OptionException => println(e.getMessage)
         return context
       }
@@ -525,7 +520,7 @@ private object CreateCommand {
   }
 
   private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
       if (args.isEmpty)
         opts
       else {
@@ -536,7 +531,7 @@ private object CreateCommand {
           case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
           case LongOption("sequential") | ShortOption("s") => parse(rest, opts + ('sequential -> true))
           case LongOption("ephemeral") | ShortOption("e") => parse(rest, opts + ('ephemeral -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -554,9 +549,7 @@ private object DeleteCommand {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try {
-        parse(args)
-      } catch {
+      val opts = try parse(args) catch {
         case e: OptionException => println(e.getMessage)
         return context
       }
@@ -581,7 +574,7 @@ private object DeleteCommand {
   }
 
   private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
       if (args.isEmpty)
         opts
       else {
@@ -593,15 +586,13 @@ private object DeleteCommand {
           case LongOption("force") | ShortOption("f") => parse(rest, opts + ('force -> true))
           case LongOption("version") | ShortOption("v") => rest.headOption match {
             case Some(version) =>
-              val _version = try {
-                version.toInt
-              } catch {
-                case _: NumberFormatException => throw new OptionException(version + ": VERSION must be an integer")
+              val _version = try version.toInt catch {
+                case _: NumberFormatException => throw new OptionException(version + ": version must be an integer")
               }
               parse(rest.tail, opts + ('version -> Some(_version)))
             case _ => throw new OptionException(arg + ": missing argument")
           }
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": unrecognized option")
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -616,8 +607,6 @@ private object DeleteCommand {
 
 private object QuitCommand {
   def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
-
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       zk.close()
       null
@@ -625,11 +614,52 @@ private object QuitCommand {
   }
 }
 
-private object UnrecognizedCommand {
-  def apply(zk: Zookeeper) = new Command {
+private object HelpCommand {
+  private val Usage = """Type `help COMMAND` for more information.
+TAB key can be used to auto-complete commands and node paths.
+
+  ls, dir        list nodes
+  cd             change working node
+  pwd            show working node
+  get            show node data
+  stat           show status of node
+  mk, create     create new node
+  rm, del        delete existing node
+  getacl         show node ACL
+  config         show connection information and session state
+  help, ?        show available commands
+  exit, quit     exit program
+"""
+
+  private val Commands = Map(
+        "ls" -> LsCommand.Usage,
+        "dir" -> LsCommand.Usage
+        )
+
+  def apply() = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      println(cmd + ": unrecognized command")
+      if (args.isEmpty)
+        println(Usage)
+      else {
+        val cmd = args.head
+        Commands get cmd match {
+          case Some(usage) => println(usage)
+          case _ => println(cmd + ": no such command")
+        }
+      }
       context
     }
   }
+}
+
+private object LongOption {
+  def unapply(arg: String): Option[String] = if (arg startsWith "--") Some(arg drop 2) else None
+}
+
+private object ShortOption {
+  def unapply(arg: String): Option[String] = if (arg startsWith "-") Some(arg drop 1) else None
+}
+
+private class OptionException(message: String, cause: Throwable) extends Exception(message, cause) {
+  def this(message: String) = this(message, null)
 }
