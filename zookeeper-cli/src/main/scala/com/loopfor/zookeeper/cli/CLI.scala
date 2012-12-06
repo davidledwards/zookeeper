@@ -1,23 +1,17 @@
 package com.loopfor.zookeeper.cli
 
-import scala.language._
-import jline.console.ConsoleReader
-import jline.console.completer.StringsCompleter
-import scala.collection.JavaConverters._
-import scala.annotation.tailrec
-import java.net.InetSocketAddress
-import com.loopfor.zookeeper.Configuration
-import scala.concurrent.duration._
-import com.loopfor.zookeeper.Zookeeper
-import com.loopfor.zookeeper.Node
-import com.loopfor.zookeeper.Path
 import com.loopfor.zookeeper._
+import java.io.IOException
+import java.net.InetSocketAddress
 import java.text.DateFormat
 import java.util.Date
-import jline.console.completer.Completer
-import jline.console.completer.ArgumentCompleter
 import java.util.concurrent.atomic.AtomicReference
-import java.io.IOException
+import jline.console.ConsoleReader
+import jline.console.completer.{Completer, ArgumentCompleter, StringsCompleter}
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+import scala.concurrent.duration._
+import scala.language._
 
 object CLI {
   def main(args: Array[String]) {
