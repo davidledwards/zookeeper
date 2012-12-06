@@ -32,6 +32,12 @@
 
 	<dependencies>
 		<dependency>
+			<groupId>org.scala-lang</groupId>
+			<artifactId>scala-library</artifactId>
+			<version>${scala.version}</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
 			<groupId>com.loopfor.zookeeper</groupId>
 			<artifactId>zookeeper-client</artifactId>
 			<version>1.0-SNAPSHOT</version>

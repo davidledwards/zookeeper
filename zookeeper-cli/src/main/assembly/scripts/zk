@@ -4,4 +4,4 @@ __BASE_DIR=$(cd $(dirname $0)/..; pwd)
 . "$__BASE_DIR"/bin/setenv.sh
 __CLASSPATH=$(echo $__BASE_DIR/lib/*.jar | sed "s/ /:/g")
 __CLASS=com.loopfor.zookeeper.cli.CLI
-$__SCALA $SCALA_OPTS -classpath $__CLASSPATH $__CLASS "$@"
+$__JAVA $JAVA_OPTS $SCALA_OPTS -classpath $__CLASSPATH $__CLASS "$@"

@@ -24,9 +24,6 @@
             <includes>
                 <include>*.jar</include>
             </includes>
-            <excludes>
-            	<exclude>scala-library-*.jar</exclude>
-            </excludes>
             <outputDirectory>lib</outputDirectory>
             <fileMode>0644</fileMode>
         </fileSet>

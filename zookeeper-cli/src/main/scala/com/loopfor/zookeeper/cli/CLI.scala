@@ -34,7 +34,7 @@ object CLI {
     }
   }
 
-  private val Usage = """usage: zk OPTIONS SERVER...
+  private val Usage = """usage: zk [OPTIONS] SERVER[...]
        zk [-? | --help]
 
   An interactive client capable of connecting to a ZooKeeper cluster. At least
@@ -109,8 +109,8 @@ options:
           "config" -> ConfigCommand(config, state),
           "cd" -> CdCommand(),
           "pwd" -> PwdCommand(),
-          "ls" -> LsCommand(zk),
-          "dir" -> LsCommand(zk),
+          "ls" -> ListCommand(zk),
+          "dir" -> ListCommand(zk),
           "stat" -> StatCommand(zk),
           "get" -> GetCommand(zk),
           "getacl" -> GetACLCommand(zk),
@@ -140,7 +140,7 @@ options:
             println("connection lost")
             context
           case _: SessionExpiredException =>
-            println("session has expired; `quit` and restart program")
+            println("session has expired; `exit` and restart CLI")
             context
           case e: KeeperException =>
             println("internal zookeeper error: " + e.getMessage)
@@ -257,6 +257,24 @@ object Reader {
 private trait Command extends ((String, Seq[String], Path) => Path)
 
 private object ConfigCommand {
+  val Usage = """usage: config
+
+  Shows connection information and session state.
+
+  Possible session states, which indicate connectedness to the ZooKeeper
+  cluster, include:
+    * Disconnected
+    * Connected
+    * ConnectedReadOnly
+    * AuthenticationFailed
+    * Authenticated
+    * Expired
+
+  In general, session state may change between connected and disconnected
+  because of temporary loss of connectivity, but once expired, the CLI must
+  be stopped before a new session can be established.
+"""
+
   def apply(config: Configuration, state: AtomicReference[StateEvent]) = new Command {
     def apply(cmd: String, args: Seq[String], context: Path) = {
       println("servers: " + (config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","))
@@ -268,12 +286,11 @@ private object ConfigCommand {
   }
 }
 
-private object LsCommand {
-  val Usage= """usage: ls OPTIONS PATH...
-       dir OPTIONS PATH...
+private object ListCommand {
+  val Usage= """usage: ls|dir [OPTIONS] [PATH...]
 
   List child nodes for each PATH. PATH may be omitted, in which case the
-  current working node is assumed.
+  current working path is assumed.
 
 options:
   --recursive, -r            : recursively list nodes
@@ -348,6 +365,12 @@ options:
 }
 
 private object CdCommand {
+  val Usage = """usage: cd [PATH]
+
+  Changes the current working path to PATH if specified. If PATH is omitted,
+  then '/' is assumed.
+"""
+
   def apply() = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       if (args.isEmpty) Path("/") else context.resolve(args.head).normalize
@@ -356,6 +379,11 @@ private object CdCommand {
 }
 
 private object PwdCommand {
+  val Usage = """usage: pwd
+
+  Shows the current working path.
+"""
+
   def apply() = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       println(context.path)
@@ -365,6 +393,14 @@ private object PwdCommand {
 }
 
 private object StatCommand {
+  val Usage = """usage stat [OPTIONS] [PATH...]
+
+  Gets the status for the node specified by each PATH. PATH may be omitted, in
+  which case the current working path is assumed.
+
+options:
+"""
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
     private val formatter = DateFormat.getDateTimeInstance
@@ -401,6 +437,14 @@ private object StatCommand {
 }
 
 private object GetCommand {
+  val Usage = """usage: get [OPTIONS] [PATH...]
+
+  Gets the data for the node specified by each PATH. PATH may be omitted, in
+  which case the current working path is assumed.
+
+options:
+"""
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
@@ -448,6 +492,14 @@ private object GetCommand {
 }
 
 private object GetACLCommand {
+  val Usage = """usage: getacl [OPTIONS] [PATH...]
+
+  Gets the ACL for the node specified by each PATH. PATH may be omitted, in
+  which case the current working path is assumed.
+
+options:
+"""
+
   def apply(zk: Zookeeper) = new Command {
     implicit private val _zk = zk
 
@@ -487,6 +539,17 @@ private object GetACLCommand {
 }
 
 private object CreateCommand {
+  val Usage = """usage: mk|create [OPTIONS] [PATH...]
+
+  Creates the node specified by each PATH. PATH may be omitted, in which case
+  the current working path is assumed.
+
+options:
+  --recursive, -r            : recursively creates intermediate nodes
+  --sequential, -s           : appends sequence to node name
+  --ephemeral, -e            : node automatically deleted when CLI exits
+"""
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
@@ -545,6 +608,21 @@ private object CreateCommand {
 }
 
 private object DeleteCommand {
+  val Usage = """usage: rm|del [OPTIONS] PATH
+
+  Deletes the node specified by PATH.
+
+  The version of the node must be provided and match the version in ZooKeeper,
+  otherwise the operation will fail. Alternatively, --force can be used to
+  ensure deletion of the node without specifying a version.
+
+options:
+  --recursive, -r            : recursively deletes nodes under PATH
+                               (implies --force on child nodes)
+  --version, -v VERSION      : version required to match in ZooKeeper
+  --force, -f                : forcefully delete node regardless of version
+"""
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
@@ -556,7 +634,12 @@ private object DeleteCommand {
       val recurse = opts('recursive).asInstanceOf[Boolean]
       val force = opts('force).asInstanceOf[Boolean]
       val version = opts('version).asInstanceOf[Option[Int]]
-      val path = opts('params).asInstanceOf[Seq[String]].head
+      val params = opts('params).asInstanceOf[Seq[String]]
+      if (params.isEmpty) {
+        println("path must be specified")
+        return context
+      }
+      val path = params.head
       if (!force && version.isEmpty) {
         println("version must be specified; otherwise use --force")
         return context
@@ -601,11 +684,16 @@ private object DeleteCommand {
           'recursive -> false,
           'force -> false,
           'version -> None,
-          'params -> Seq("")))
+          'params -> Seq[String]()))
   }
 }
 
 private object QuitCommand {
+  val Usage = """usage: exit|quit
+
+  Exits the CLI.
+"""
+
   def apply(zk: Zookeeper) = new Command {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       zk.close()
@@ -615,25 +703,38 @@ private object QuitCommand {
 }
 
 private object HelpCommand {
-  private val Usage = """Type `help COMMAND` for more information.
+  val Usage = """Type `help COMMAND` for more information.
 TAB key can be used to auto-complete commands and node paths.
 
   ls, dir        list nodes
-  cd             change working node
-  pwd            show working node
-  get            show node data
-  stat           show status of node
+  cd             change working path
+  pwd            show working path
+  get            get node data
+  stat           get node status
   mk, create     create new node
   rm, del        delete existing node
-  getacl         show node ACL
+  getacl         get node ACL
   config         show connection information and session state
   help, ?        show available commands
   exit, quit     exit program
 """
 
   private val Commands = Map(
-        "ls" -> LsCommand.Usage,
-        "dir" -> LsCommand.Usage
+        "ls" -> ListCommand.Usage,
+        "dir" -> ListCommand.Usage,
+        "cd" -> CdCommand.Usage,
+        "pwd" -> PwdCommand.Usage,
+        "get" -> GetCommand.Usage,
+        "stat" -> StatCommand.Usage,
+        "mk" -> CreateCommand.Usage,
+        "create" -> CreateCommand.Usage,
+        "rm" -> DeleteCommand.Usage,
+        "del" -> DeleteCommand.Usage,
+        "getacl" -> GetACLCommand.Usage,
+        "config" -> ConfigCommand.Usage,
+        "help" -> HelpCommand.Usage,
+        "exit" -> QuitCommand.Usage,
+        "quit" -> QuitCommand.Usage
         )
 
   def apply() = new Command {

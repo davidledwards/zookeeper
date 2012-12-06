@@ -1,16 +1,17 @@
 #!/bin/bash
 
-if [[ -z "$SCALA_HOME" ]]; then
-   __SCALA=$(which scala)
-   if [[ -z $__SCALA ]]; then
-      echo "SCALA_HOME environment variable not defined"
+if [[ -z "$JAVA_HOME" && -z "$JRE_HOME" ]]; then
+   __JAVA=$(which java)
+   if [[ -z "$__JAVA" ]]; then
+      echo "neither JAVA_HOME nor JRE_HOME environment variable defined"
       exit 1
    fi
 else
-   __SCALA=$SCALA_HOME/bin/scala
+   __JAVA_HOME=${JRE_HOME:-"${JAVA_HOME}"}
+   __JAVA=$__JAVA_HOME/bin/java
 fi
 
-if [[ ! (-f "$__SCALA" && -x "$__SCALA") ]]; then
-   echo "$__SCALA not a suitable program"
-   exit 1
+if [[ ! (-f "$__JAVA" && -x "$__JAVA") ]]; then
+    echo "$__JAVA not a suitable program"
+    exit 1
 fi
