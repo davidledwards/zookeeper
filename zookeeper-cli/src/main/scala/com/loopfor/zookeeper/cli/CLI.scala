@@ -3,6 +3,7 @@ package com.loopfor.zookeeper.cli
 import com.loopfor.zookeeper._
 import java.io.IOException
 import java.net.InetSocketAddress
+import java.nio.charset.{Charset, UnsupportedCharsetException}
 import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
@@ -39,8 +40,6 @@ options:
   --timeout, -t SECONDS      : session timeout (0=default)
   --readonly, -r             : allow readonly connection
 """
-
-  private val COMMANDS = Seq("ls", "quit")
 
   private def run(args: Array[String]): Int = {
     import Console.err
@@ -101,8 +100,8 @@ options:
 
     val commands = Map[String, Command](
           "config" -> ConfigCommand(config, state),
-          "cd" -> CdCommand(),
-          "pwd" -> PwdCommand(),
+          "cd" -> CdCommand(zk),
+          "pwd" -> PwdCommand(zk),
           "ls" -> ListCommand(zk),
           "dir" -> ListCommand(zk),
           "stat" -> StatCommand(zk),
@@ -359,30 +358,109 @@ options:
 }
 
 private object CdCommand {
-  val Usage = """usage: cd [PATH]
+  val Usage = """usage: cd [OPTIONS] [PATH|-]
 
   Changes the current working path to PATH if specified. If PATH is omitted,
-  then '/' is assumed.
+  then `/` is assumed. In addition, if PATH is `-`, then the previous working
+  path is chosen.
+
+options:
+  --check, -c                : check existence of node at working path
+                               (does not fail command if nonexistent)
 """
 
-  def apply() = new Command {
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
+    val last = new AtomicReference(Path("/"))
+
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      if (args.isEmpty) Path("/") else context.resolve(args.head).normalize
+      val opts = try parse(args) catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val check = opts('check).asInstanceOf[Boolean]
+      val params = opts('params).asInstanceOf[Seq[String]]
+      val path = params.head match {
+        case "-" => last.get
+        case "" => Path("/")
+        case p => context.resolve(p).normalize
+      }
+      if (check) {
+        Node(path).exists() match {
+          case Some(status) => println(path)
+          case _ => println(path + ": does not exist")
+        }
+      }
+      last.set(context)
+      path
     }
+  }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case "-" => opts + ('params -> args)
+          case LongOption("check") | ShortOption("c") => parse(rest, opts + ('check -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'check -> false,
+          'params -> Seq("")))
   }
 }
 
 private object PwdCommand {
-  val Usage = """usage: pwd
+  val Usage = """usage: pwd [OPTIONS]
 
   Shows the current working path.
+
+options:
+  --check, -c                : check existence of node at working path
 """
 
-  def apply() = new Command {
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      println(context.path)
+      val opts = try parse(args) catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val check = opts('check).asInstanceOf[Boolean]
+      print(context)
+      if (check && Node(context).exists().isEmpty) print(": does not exist")
+      println()
       context
     }
+  }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("check") | ShortOption("c") => parse(rest, opts + ('check -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'check -> false))
   }
 }
 
@@ -397,7 +475,6 @@ options:
 
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
-    private val formatter = DateFormat.getDateTimeInstance
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       val paths = if (args.isEmpty) args :+ "" else args
@@ -408,17 +485,7 @@ options:
           case Some(status) =>
             if (count > 1)
               println(node.path + ":")
-            println("czxid: " + status.czxid)
-            println("mzxid: " + status.mzxid)
-            println("pzxid: " + status.pzxid)
-            println("ctime: " + status.ctime + " (" + formatter.format(new Date(status.ctime)) + ")")
-            println("mtime: " + status.mtime + " (" + formatter.format(new Date(status.mtime)) + ")")
-            println("version: " + status.version)
-            println("cversion: " + status.cversion)
-            println("aversion: " + status.aversion)
-            println("owner: " + status.ephemeralOwner)
-            println("datalen: " + status.dataLength)
-            println("children: " + status.numChildren)
+            println(StatusFormatter(status))
             if (count > 1 && i < count)
               println()
           case _ => println(node.path + ": no such node")
@@ -430,20 +497,57 @@ options:
   }
 }
 
+private object StatusFormatter {
+  private val dateFormat = DateFormat.getDateTimeInstance
+
+  def apply(status: Status): String = {
+    "czxid: " + status.czxid + "\n" +
+    "mzxid: " + status.mzxid + "\n" +
+    "pzxid: " + status.pzxid + "\n" +
+    "ctime: " + status.ctime + " (" + dateFormat.format(new Date(status.ctime)) + ")\n" +
+    "mtime: " + status.mtime + " (" + dateFormat.format(new Date(status.mtime)) + ")\n" +
+    "version: " + status.version + "\n" +
+    "cversion: " + status.cversion + "\n" +
+    "aversion: " + status.aversion + "\n" +
+    "owner: " + status.ephemeralOwner + "\n" +
+    "datalen: " + status.dataLength + "\n" +
+    "children: " + status.numChildren
+  }
+}
+
 private object GetCommand {
   val Usage = """usage: get [OPTIONS] [PATH...]
 
   Gets the data for the node specified by each PATH. PATH may be omitted, in
   which case the current working path is assumed.
 
+  By default, data is displayed in a hex/ASCII table with offsets, though the
+  output format can be changed using --string or --binary. If --string is
+  chosen, it may be necessary to also specify the character encoding if the
+  default of `UTF-8` is incorrect. The CHARSET in --encoding refers to any of
+  the possible character sets installed on the underlying JRE.
+
 options:
+  --hex, -h                  : display data as hex/ASCII (default)
+  --string, -s               : display data as string (see --encoding)
+  --binary, -b               : display data as binary
+  --encoding, -e CHARSET     : charset for use with --string (default is UTF-8)
+  --all, -a                  : display node status
 """
+
+  private val UTF_8 = Charset forName "UTF-8"
 
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val paths = if (args.isEmpty) args :+ "" else args
+      val opts = try parse(args) catch {
+        case e: OptionException => println(e.getMessage)
+        return context
+      }
+      val format = opts('format).asInstanceOf[Symbol]
+      val all = opts('all).asInstanceOf[Boolean]
+      val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
@@ -451,7 +555,15 @@ options:
           val (data, status) = node.get()
           if (count > 1)
             println(node.path + ":")
-          display(data)
+          if (all) {
+            println(StatusFormatter(status))
+            println()
+          }
+          format match {
+            case 'hex => displayHex(data)
+            case 'string => displayString(data, opts('encoding).asInstanceOf[Charset])
+            case 'binary => displayBinary(data)
+          }
           if (count > 1 && i < count)
             println()
         } catch {
@@ -463,8 +575,45 @@ options:
     }
   }
 
-  private def display(data: Array[Byte]) {
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("hex") | ShortOption("h") => parse(rest, opts + ('format -> 'hex))
+          case LongOption("string") | ShortOption("s") => parse(rest, opts + ('format -> 'string))
+          case LongOption("binary") | ShortOption("b") => parse(rest, opts + ('format -> 'binary))
+          case LongOption("encoding") | ShortOption("e") => rest.headOption match {
+            case Some(charset) =>
+              val cs = try Charset forName charset catch {
+                case _: UnsupportedCharsetException => throw new OptionException(charset + ": no such charset")
+              }
+              parse(rest.tail, opts + ('encoding -> cs))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("all") | ShortOption("a") => parse(rest, opts + ('all -> true))
+          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'format -> 'hex,
+          'encoding -> UTF_8,
+          'all -> false,
+          'params -> Seq("")))
+  }
+
+  private def displayHex(data: Array[Byte]) {
     @tailrec def display(n: Int) {
+      def charOf(b: Byte) = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
+
+      def pad(n: Int) = Array.fill(n)(' ') mkString
+
       if (n < data.length) {
         val l = Math.min(n + 16, data.length) - n
         print("%08x  " format n)
@@ -480,9 +629,11 @@ options:
     display(0)
   }
 
-  private def charOf(b: Byte): Char = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
+  private def displayString(data: Array[Byte], cs: Charset) =
+    println(new String(data, cs))
 
-  private def pad(n: Int): String = Array.fill(n)(' ') mkString
+  private def displayBinary(data: Array[Byte]) =
+    Console.out.write(data, 0, data.length)
 }
 
 private object GetACLCommand {
@@ -698,8 +849,19 @@ private object QuitCommand {
 
 private object HelpCommand {
   val Usage = """Type `help COMMAND` for more information.
-TAB key can be used to auto-complete commands and node paths.
 
+  The TAB key can be used to auto-complete commands and node paths. Pressing
+  TAB on the first argument will try to find commands matching the prefix,
+  whereas, all subsequent TAB depressions will attempt to match existing nodes
+  relative to the current working path.
+
+  In all cases requiring paths, both absolute and relative forms may be given.
+  Absolute paths start with `/`, which means that the current working path is
+  ignored. Relative paths, on the other hand, are resolved in the context of
+  the current working path. In addition, both `.` and `..` may be used in paths
+  indicating the current and parent node, respectively.
+
+commands:
   ls, dir        list nodes
   cd             change working path
   pwd            show working path
