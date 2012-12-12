@@ -13,6 +13,9 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language._
+import java.io.FileInputStream
+import java.io.FileNotFoundException
+import scala.collection.mutable.ArrayBuilder
 
 object CLI {
   def main(args: Array[String]) {
@@ -36,8 +39,8 @@ object CLI {
   one SERVER in the cluster must be specified, which is defined as `host:port`.
 
 options:
-  --path, -p                 : root path (/=default)
-  --timeout, -t SECONDS      : session timeout (0=default)
+  --path, -p                 : root path (default=/)
+  --timeout, -t SECONDS      : session timeout (default=0)
   --readonly, -r             : allow readonly connection
 """
 
@@ -531,7 +534,7 @@ options:
   --hex, -h                  : display data as hex/ASCII (default)
   --string, -s               : display data as string (see --encoding)
   --binary, -b               : display data as binary
-  --encoding, -e CHARSET     : charset for use with --string (default is UTF-8)
+  --encoding, -e CHARSET     : charset for use with --string (default=UTF-8)
   --all, -a                  : display node status
 """
 
@@ -684,16 +687,32 @@ options:
 }
 
 private object CreateCommand {
-  val Usage = """usage: mk|create [OPTIONS] [PATH...]
+  val Usage = """usage: mk|create [OPTIONS] PATH [DATA]
 
-  Creates the node specified by each PATH. PATH may be omitted, in which case
-  the current working path is assumed.
+  Creates the node specified by PATH with optional DATA.
+
+  DATA is optional, and if omitted, creates the node without any attached data.
+  If DATA does not begin with `@`, it is assumed to be a Unicode string, which
+  by default, is encoded as UTF-8 at time of storage. The --encoding option is
+  used to provide an alternative CHARSET, which may be any of the possible
+  character sets installed on the underlying JRE.
+
+  If DATA is prefixed with `@`, this indicates that the remainder of the
+  argument is a filename and whose contents will be attached to the node when
+  created.
+
+  The parent node of PATH must exist and must not be ephemeral. The --recursive
+  option can be used to create intermediate nodes, though the first existing
+  node in PATH must not be ephemeral.
 
 options:
-  --recursive, -r            : recursively creates intermediate nodes
-  --sequential, -s           : appends sequence to node name
-  --ephemeral, -e            : node automatically deleted when CLI exits
+  --recursive, -r            : recursively create intermediate nodes
+  --encoding, -e CHARSET     : charset used for encoding DATA (default=UTF-8)
+  --sequential, -S           : appends sequence to node name
+  --ephemeral, -E            : node automatically deleted when CLI exits
 """
+
+  private val UTF_8 = Charset forName "UTF-8"
 
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
@@ -705,17 +724,61 @@ options:
       }
       val recurse = opts('recursive).asInstanceOf[Boolean]
       val disp = disposition(opts)
-      val path = opts('params).asInstanceOf[Seq[String]].head
+      val params = opts('params).asInstanceOf[Seq[String]]
+      val path = if (params.isEmpty) {
+        println("path must be specified")
+        return context
+      } else
+        params.head
+      val data = params.tail.headOption match {
+        case Some(d) => d.headOption match {
+          case Some('@') =>
+            val name = d drop 1
+            val file = try new FileInputStream(name) catch {
+              case _: FileNotFoundException =>
+                println(name + ": file not found")
+                return context
+              case _: SecurityException =>
+                println(name + ": access denied")
+                return context
+            }
+            try read(file) catch {
+              case e: IOException =>
+                println(name + ": I/O error: " + e.getMessage)
+                return context
+            } finally
+              file.close()
+          case _ => d getBytes opts('encoding).asInstanceOf[Charset]
+        }
+        case _ => Array[Byte]()
+      }
       val node = Node(context resolve path)
       try {
-        node.create(Array(), ACL.EveryoneAll, disp)
+        if (recurse) {
+          (Path("/") /: node.path.parts.tail.dropRight(1)) { case (parent, part) =>
+            val node = Node(parent resolve part)
+            try node.create(Array(), ACL.EveryoneAll, Persistent) catch {
+              case _: NodeExistsException =>
+            }
+            node.path
+          }
+        }
+        node.create(data, ACL.EveryoneAll, disp)
       } catch {
         case e: NodeExistsException => println(Path(e.getPath).normalize + ": node already exists")
         case _: NoNodeException => println(node.parent.path + ": no such parent node")
-        case _: NoChildrenForEphemeralsException => println(node.parent.path + ": parent node is ephemeral")
+        case e: NoChildrenForEphemeralsException => println(Path(e.getPath).normalize + ": parent node is ephemeral")
       }
       context
     }
+  }
+
+  private def read(file: FileInputStream): Array[Byte] = {
+    @tailrec def read(buffer: ArrayBuilder[Byte]): Array[Byte] = {
+      val c = file.read()
+      if (c == -1) buffer.result else read(buffer += c.toByte)
+    }
+    read(ArrayBuilder.make[Byte])
   }
 
   private def disposition(opts: Map[Symbol, Any]): Disposition = {
@@ -737,8 +800,16 @@ options:
         arg match {
           case "--" => opts + ('params -> rest)
           case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
-          case LongOption("sequential") | ShortOption("s") => parse(rest, opts + ('sequential -> true))
-          case LongOption("ephemeral") | ShortOption("e") => parse(rest, opts + ('ephemeral -> true))
+          case LongOption("encoding") | ShortOption("e") => rest.headOption match {
+            case Some(charset) =>
+              val cs = try Charset forName charset catch {
+                case _: UnsupportedCharsetException => throw new OptionException(charset + ": no such charset")
+              }
+              parse(rest.tail, opts + ('encoding -> cs))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("sequential") | ShortOption("S") => parse(rest, opts + ('sequential -> true))
+          case LongOption("ephemeral") | ShortOption("E") => parse(rest, opts + ('ephemeral -> true))
           case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
@@ -746,9 +817,10 @@ options:
     }
     parse(args, Map(
           'recursive -> false,
+          'encoding -> UTF_8,
           'sequential -> false,
           'ephemeral -> false,
-          'params -> Seq("")))
+          'params -> Seq[String]()))
   }
 }
 
@@ -780,11 +852,11 @@ options:
       val force = opts('force).asInstanceOf[Boolean]
       val version = opts('version).asInstanceOf[Option[Int]]
       val params = opts('params).asInstanceOf[Seq[String]]
-      if (params.isEmpty) {
+      val path = if (params.isEmpty) {
         println("path must be specified")
         return context
-      }
-      val path = params.head
+      } else
+        params.head
       if (!force && version.isEmpty) {
         println("version must be specified; otherwise use --force")
         return context
