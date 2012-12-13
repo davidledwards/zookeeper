@@ -1,7 +1,7 @@
 package com.loopfor.zookeeper.cli
 
 import com.loopfor.zookeeper._
-import java.io.IOException
+import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.net.InetSocketAddress
 import java.nio.charset.{Charset, UnsupportedCharsetException}
 import java.text.DateFormat
@@ -11,11 +11,9 @@ import jline.console.ConsoleReader
 import jline.console.completer.{Completer, ArgumentCompleter, StringsCompleter}
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuilder
 import scala.concurrent.duration._
 import scala.language._
-import java.io.FileInputStream
-import java.io.FileNotFoundException
-import scala.collection.mutable.ArrayBuilder
 
 object CLI {
   def main(args: Array[String]) {
