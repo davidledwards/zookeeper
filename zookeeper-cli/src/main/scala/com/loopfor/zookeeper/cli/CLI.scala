@@ -4,7 +4,7 @@ import com.loopfor.zookeeper._
 import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.net.InetSocketAddress
 import java.nio.charset.{Charset, UnsupportedCharsetException}
-import java.text.DateFormat
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 import jline.console.ConsoleReader
@@ -286,8 +286,13 @@ private object ListCommand {
   List child nodes for each PATH. PATH may be omitted, in which case the
   current working path is assumed.
 
+  When --long is specified, node names are optionally appended with `/` if the
+  node has chidren or `*` if the node is ephemeral. In all cases, the version
+  of the node follows.
+
 options:
   --recursive, -r            : recursively list nodes
+  --long, -l                 : display in long format
 """
 
   def apply(zk: Zookeeper) = new Command {
@@ -299,6 +304,7 @@ options:
         return context
       }
       val recurse = opts('recursive).asInstanceOf[Boolean]
+      val format = opts('format).asInstanceOf[(Node, Int) => String]
       val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
@@ -308,9 +314,9 @@ options:
           if (count > 1)
             println(node.path + ":")
           if (recurse)
-            traverse(children, 0)
+            traverse(children, 0, format)
           else
-            children foreach { child => println(child.name) }
+            children foreach { child => println(format(child, 0)) }
           if (count > 1 && i < count)
             println()
         } catch {
@@ -322,15 +328,31 @@ options:
     }
   }
 
-  private def traverse(children: Seq[Node], depth: Int) {
+  private def formatShort(node: Node, depth: Int): String =
+    indent(depth) + node.name
+
+  private def formatLong(node: Node, depth: Int): String = {
+    indent(depth) + node.name + (node.exists() match {
+      case Some(status) =>
+        (if (status.numChildren > 0) "/ " else if (status.ephemeralOwner != 0) "* " else " ") +
+        status.version
+      case _ => " ?"
+    })
+  }
+
+  private def indent(depth: Int) = {
+    def pad(depth: Int) = Array.fill((depth - 1) * 2)(' ') mkString
+
+    if (depth > 0) pad(depth) + "+ " else ""
+  }
+
+  private def traverse(children: Seq[Node], depth: Int, format: (Node, Int) => String) {
     children foreach { child =>
-      if (depth > 0)
-        print(pad(depth) + "+ ")
-      println(child.name)
+      println(format(child, depth))
       try {
-        traverse(child.children() sortBy { _.name }, depth + 1)
+        traverse(child.children() sortBy { _.name }, depth + 1, format)
       } catch {
-        case _: NoNodeException => // ignore nodes that disappear during traversal
+        case _: NoNodeException =>
       }
     }
   }
@@ -345,6 +367,7 @@ options:
         arg match {
           case "--" => opts + ('params -> rest)
           case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
+          case LongOption("long") | ShortOption("l") => parse(rest, opts + ('format -> formatLong _))
           case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
@@ -352,10 +375,9 @@ options:
     }
     parse(args, Map(
           'recursive -> false,
+          'format -> formatShort _,
           'params -> Seq("")))
   }
-
-  private def pad(depth: Int) = Array.fill((depth - 1) * 2)(' ') mkString
 }
 
 private object CdCommand {
@@ -474,6 +496,8 @@ private object StatCommand {
 options:
 """
 
+  private val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
@@ -486,7 +510,7 @@ options:
           case Some(status) =>
             if (count > 1)
               println(node.path + ":")
-            println(StatusFormatter(status))
+            println(format(status))
             if (count > 1 && i < count)
               println()
           case _ => println(node.path + ": no such node")
@@ -496,12 +520,8 @@ options:
       context
     }
   }
-}
 
-private object StatusFormatter {
-  private val dateFormat = DateFormat.getDateTimeInstance
-
-  def apply(status: Status): String = {
+  private def format(status: Status): String = {
     "czxid: " + status.czxid + "\n" +
     "mzxid: " + status.mzxid + "\n" +
     "pzxid: " + status.pzxid + "\n" +
@@ -533,7 +553,6 @@ options:
   --string, -s               : display data as string (see --encoding)
   --binary, -b               : display data as binary
   --encoding, -e CHARSET     : charset for use with --string (default=UTF-8)
-  --all, -a                  : display node status
 """
 
   private val UTF_8 = Charset forName "UTF-8"
@@ -547,7 +566,6 @@ options:
         return context
       }
       val format = opts('format).asInstanceOf[Symbol]
-      val all = opts('all).asInstanceOf[Boolean]
       val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
@@ -556,10 +574,6 @@ options:
           val (data, status) = node.get()
           if (count > 1)
             println(node.path + ":")
-          if (all) {
-            println(StatusFormatter(status))
-            println()
-          }
           format match {
             case 'hex => displayHex(data)
             case 'string => displayString(data, opts('encoding).asInstanceOf[Charset])
@@ -596,7 +610,6 @@ options:
               parse(rest.tail, opts + ('encoding -> cs))
             case _ => throw new OptionException(arg + ": missing argument")
           }
-          case LongOption("all") | ShortOption("a") => parse(rest, opts + ('all -> true))
           case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
@@ -605,7 +618,6 @@ options:
     parse(args, Map(
           'format -> 'hex,
           'encoding -> UTF_8,
-          'all -> false,
           'params -> Seq("")))
   }
 

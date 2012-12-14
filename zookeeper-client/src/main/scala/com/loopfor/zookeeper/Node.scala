@@ -5,6 +5,8 @@ trait Node {
   def path: Path
   def parent: Node
   def parentOption: Option[Node]
+  def resolve(path: String): Node
+  def resolve(path: Path): Node
   def create(data: Array[Byte], acl: Seq[ACL], disp: Disposition): Node
   def delete(version: Option[Int])
   def get(): (Array[Byte], Status)
@@ -37,6 +39,10 @@ object Node {
       case Some(p) => Some(Node(p))
       case _ => None
     }
+
+    def resolve(path: String): Node = Node(this.path resolve path)
+
+    def resolve(path: Path): Node = resolve(path.path)
 
     def create(data: Array[Byte], acl: Seq[ACL], disp: Disposition): Node =
       Node(zk.create(path.path, data, acl, disp))
