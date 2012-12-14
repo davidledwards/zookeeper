@@ -83,12 +83,29 @@ object Id {
   def unapply(id: Id): Option[(String, String)] =
     if (id == null) None else Some(id.scheme, id.id)
 
+  /**
+   * Used in pattern matching to deconstruct an identity represented as a string.
+   * 
+   * The syntax of `id` is `<scheme>:<id>`.
+   * 
+   * @param id selector value
+   * @return a `Some` containing `scheme` and `id` if the selector value is not `null` and conforms to the specified syntax,
+   * otherwise `None`
+   */
+  def unapply(id: String): Option[(String, String)] = {
+    if (id == null) None
+    else (id indexOf ':') match {
+      case -1 => None
+      case n => Some(id take n, id drop n + 1)
+    }
+  }
+
   private[zookeeper] def toId(id: Id): ZId = id.asInstanceOf[ZId]
 
   private class Impl(val scheme: String, val id: String) extends ZId(scheme, id) with Id {
     def permit(permission: Int): ACL = ACL(this, permission)
 
-    override def toString: String = "Id(" + scheme + "," + id + ")"
+    override def toString: String = scheme + ":" + id
   }
 }
 
@@ -181,6 +198,29 @@ object ACL {
   def unapply(acl: ACL): Option[(Id, Int)] =
     if (acl == null) None else Some(acl.id, acl.permission)
 
+  /**
+   * Used in pattern matching to deconstruct an ACL represented as a string.
+   * 
+   * The syntax of `acl` is `<scheme>:<id>=[rwcda]`
+   * 
+   * @param acl selector value
+   * @return a `Some` containing `id` and `permission` if the selector value is not `null` and conforms to the specified
+   * syntax, otherwise `None`
+   */
+  def unapply(acl: String): Option[(Id, Int)] = {
+    if (acl == null) None
+    else (acl indexOf '=') match {
+      case -1 => None
+      case n => (acl take n) match {
+        case Id(scheme, id) => (acl drop n + 1) match {
+          case Permission(permission) => Some(Id(scheme, id), permission)
+          case _ => None
+        }
+        case _ => None
+      }
+    }
+  }
+
   private[zookeeper] def apply(zacl: ZACL): ACL = new Impl(Id(zacl.getId), zacl.getPerms)
 
   private[zookeeper] def apply(zacl: java.util.List[ZACL]): Seq[ACL] =
@@ -194,6 +234,32 @@ object ACL {
   implicit def tupleToIdentity(id: (String, String)): Id = Id(id._1, id._2)
 
   private class Impl(val id: Id, val permission: Int) extends ZACL(permission, Id.toId(id)) with ACL {
-    override def toString: String = "ACL(" + id + "," + permission + ")"
+    override def toString: String = id + "=" + Permission(permission)
+  }
+
+  private object Permission {
+    def apply(permission: Int): String = {
+      (if ((permission & Read) == 0) "-" else "r") +
+      (if ((permission & Write) == 0) "-" else "w") +
+      (if ((permission & Create) == 0) "-" else "c") +
+      (if ((permission & Delete) == 0) "-" else "d") +
+      (if ((permission & Admin) == 0) "-" else "a")
+    }
+
+    def unapply(perms: String): Option[Int] = {
+      if (perms == null) None
+      else {
+        val permission = (0 /: perms) { case (p, c) =>
+            if (c == 'r') p | Read
+            else if (c == 'w') p | Write
+            else if (c == 'c') p | Create
+            else if (c == 'd') p | Delete
+            else if (c == 'a') p | Admin
+            else if (c == '*') p | All
+            else return None
+        }
+        Some(permission)
+      }
+    }
   }
 }
