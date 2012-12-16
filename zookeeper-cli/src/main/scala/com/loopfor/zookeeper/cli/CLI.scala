@@ -108,6 +108,7 @@ options:
           "stat" -> StatCommand(zk),
           "get" -> GetCommand(zk),
           "getacl" -> GetACLCommand(zk),
+          "setacl" -> SetACLCommand(zk),
           "mk" -> CreateCommand(zk),
           "create" -> CreateCommand(zk),
           "rm" -> DeleteCommand(zk),
@@ -130,11 +131,17 @@ options:
         val _context = try {
           if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
         } catch {
+          case e: CommandException =>
+            println(e.getMessage)
+            context
           case _: ConnectionLossException =>
             println("connection lost")
             context
           case _: SessionExpiredException =>
             println("session has expired; `exit` and restart CLI")
+            context
+          case _: NoAuthException =>
+            println("not authorized")
             context
           case e: KeeperException =>
             println("internal zookeeper error: " + e.getMessage)
@@ -185,7 +192,7 @@ options:
   }
 }
 
-object Reader {
+private object Reader {
   def apply(commands: Set[String], zk: Zookeeper) = new (Path => Seq[String]) {
     private val reader = new ConsoleReader
     reader.setBellEnabled(false)
@@ -250,6 +257,12 @@ object Reader {
 
 private trait Command extends ((String, Seq[String], Path) => Path)
 
+private class CommandException(message: String) extends Exception(message)
+
+private object Command {
+  def error(message: String): Nothing = throw new CommandException(message)
+}
+
 private object ConfigCommand {
   val Usage = """usage: config
 
@@ -281,6 +294,8 @@ private object ConfigCommand {
 }
 
 private object ListCommand {
+  import Command._
+
   val Usage= """usage: ls|dir [OPTIONS] [PATH...]
 
   List child nodes for each PATH. PATH may be omitted, in which case the
@@ -299,10 +314,7 @@ options:
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
+      val opts = parse(args)
       val recurse = opts('recursive).asInstanceOf[Boolean]
       val format = opts('format).asInstanceOf[(Node, Int) => String]
       val paths = opts('params).asInstanceOf[Seq[String]]
@@ -311,14 +323,12 @@ options:
         val node = Node(context resolve path)
         try {
           val children = node.children() sortBy { _.name }
-          if (count > 1)
-            println(node.path + ":")
+          if (count > 1) println(node.path + ":")
           if (recurse)
             traverse(children, 0, format)
           else
             children foreach { child => println(format(child, 0)) }
-          if (count > 1 && i < count)
-            println()
+          if (count > 1 && i < count) println()
         } catch {
           case _: NoNodeException => println(node.path + ": no such node")
         }
@@ -341,8 +351,7 @@ options:
   }
 
   private def indent(depth: Int) = {
-    def pad(depth: Int) = Array.fill((depth - 1) * 2)(' ') mkString
-
+    def pad(depth: Int) = { Array.fill((depth - 1) * 2)(' ') mkString }
     if (depth > 0) pad(depth) + "+ " else ""
   }
 
@@ -368,7 +377,7 @@ options:
           case "--" => opts + ('params -> rest)
           case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
           case LongOption("long") | ShortOption("l") => parse(rest, opts + ('format -> formatLong _))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -381,6 +390,8 @@ options:
 }
 
 private object CdCommand {
+  import Command._
+
   val Usage = """usage: cd [OPTIONS] [PATH|-]
 
   Changes the current working path to PATH if specified. If PATH is omitted,
@@ -398,10 +409,7 @@ options:
     val last = new AtomicReference(Path("/"))
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
+      val opts = parse(args)
       val check = opts('check).asInstanceOf[Boolean]
       val params = opts('params).asInstanceOf[Seq[String]]
       val path = params.head match {
@@ -431,7 +439,7 @@ options:
           case "--" => opts + ('params -> rest)
           case "-" => opts + ('params -> args)
           case LongOption("check") | ShortOption("c") => parse(rest, opts + ('check -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -443,6 +451,8 @@ options:
 }
 
 private object PwdCommand {
+  import Command._
+
   val Usage = """usage: pwd [OPTIONS]
 
   Shows the current working path.
@@ -455,10 +465,7 @@ options:
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
+      val opts = parse(args)
       val check = opts('check).asInstanceOf[Boolean]
       print(context)
       if (check && Node(context).exists().isEmpty) print(": does not exist")
@@ -477,7 +484,7 @@ options:
         arg match {
           case "--" => opts + ('params -> rest)
           case LongOption("check") | ShortOption("c") => parse(rest, opts + ('check -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -488,6 +495,8 @@ options:
 }
 
 private object StatCommand {
+  import Command._
+
   val Usage = """usage stat [OPTIONS] [PATH...]
 
   Gets the status for the node specified by each PATH. PATH may be omitted, in
@@ -502,17 +511,16 @@ options:
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val paths = if (args.isEmpty) args :+ "" else args
+      val opts = parse(args)
+      val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         node.exists() match {
           case Some(status) =>
-            if (count > 1)
-              println(node.path + ":")
+            if (count > 1) println(node.path + ":")
             println(format(status))
-            if (count > 1 && i < count)
-              println()
+            if (count > 1 && i < count) println()
           case _ => println(node.path + ": no such node")
         }
         i + 1
@@ -534,9 +542,29 @@ options:
     "datalen: " + status.dataLength + "\n" +
     "children: " + status.numChildren
   }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'params -> Seq("")))
+  }
 }
 
 private object GetCommand {
+  import Command._
+
   val Usage = """usage: get [OPTIONS] [PATH...]
 
   Gets the data for the node specified by each PATH. PATH may be omitted, in
@@ -557,30 +585,23 @@ options:
 
   private val UTF_8 = Charset forName "UTF-8"
 
+  private type DisplayFunction = (Array[Byte], Map[Symbol, Any]) => Unit
+
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
-      val format = opts('format).asInstanceOf[Symbol]
+      val opts = parse(args)
+      val display = opts('display).asInstanceOf[DisplayFunction]
       val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         try {
           val (data, status) = node.get()
-          if (count > 1)
-            println(node.path + ":")
-          format match {
-            case 'hex => displayHex(data)
-            case 'string => displayString(data, opts('encoding).asInstanceOf[Charset])
-            case 'binary => displayBinary(data)
-          }
-          if (count > 1 && i < count)
-            println()
+          if (count > 1) println(node.path + ":")
+          display(data, opts)
+          if (count > 1 && i < count) println()
         } catch {
           case _: NoNodeException => println(node.path + ": no such node")
         }
@@ -599,29 +620,29 @@ options:
         val rest = args.tail
         arg match {
           case "--" => opts + ('params -> rest)
-          case LongOption("hex") | ShortOption("h") => parse(rest, opts + ('format -> 'hex))
-          case LongOption("string") | ShortOption("s") => parse(rest, opts + ('format -> 'string))
-          case LongOption("binary") | ShortOption("b") => parse(rest, opts + ('format -> 'binary))
+          case LongOption("hex") | ShortOption("h") => parse(rest, opts + ('display -> displayHex _))
+          case LongOption("string") | ShortOption("s") => parse(rest, opts + ('display -> displayString _))
+          case LongOption("binary") | ShortOption("b") => parse(rest, opts + ('display -> displayBinary _))
           case LongOption("encoding") | ShortOption("e") => rest.headOption match {
             case Some(charset) =>
               val cs = try Charset forName charset catch {
-                case _: UnsupportedCharsetException => throw new OptionException(charset + ": no such charset")
+                case _: UnsupportedCharsetException => error(charset + ": no such charset")
               }
               parse(rest.tail, opts + ('encoding -> cs))
-            case _ => throw new OptionException(arg + ": missing argument")
+            case _ => error(arg + ": missing argument")
           }
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
     }
     parse(args, Map(
-          'format -> 'hex,
+          'display -> displayHex _,
           'encoding -> UTF_8,
           'params -> Seq("")))
   }
 
-  private def displayHex(data: Array[Byte]) {
+  private def displayHex(data: Array[Byte], opts: Map[Symbol, Any]) {
     @tailrec def display(n: Int) {
       def charOf(b: Byte) = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
 
@@ -642,14 +663,18 @@ options:
     display(0)
   }
 
-  private def displayString(data: Array[Byte], cs: Charset) =
+  private def displayString(data: Array[Byte], opts: Map[Symbol, Any]) = {
+    val cs = opts('encoding).asInstanceOf[Charset]
     println(new String(data, cs))
+  }
 
-  private def displayBinary(data: Array[Byte]) =
+  private def displayBinary(data: Array[Byte], opts: Map[Symbol, Any]) =
     Console.out.write(data, 0, data.length)
 }
 
 private object GetACLCommand {
+  import Command._
+
   val Usage = """usage: getacl [OPTIONS] [PATH...]
 
   Gets the ACL for the node specified by each PATH. PATH may be omitted, in
@@ -662,17 +687,16 @@ options:
     implicit private val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val paths = if (args.isEmpty) args :+ "" else args
+      val opts = parse(args)
+      val paths = opts('params).asInstanceOf[Seq[String]]
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         try {
           val (acl, status) = node.getACL()
-          if (count > 1)
-            println(node.path + ":")
-          display(acl)
-          if (count > 1 && i < count)
-            println()
+          if (count > 1) println(node.path + ":")
+          acl foreach { println _ }
+          if (count > 1 && i < count) println()
         } catch {
           case _: NoNodeException => println(node.path + ": no such node")
         }
@@ -682,21 +706,136 @@ options:
     }
   }
 
-  private def display(acl: Seq[ACL]) {
-    acl foreach { a =>
-      print(a.id.scheme + ":" + a.id.id + "=")
-      val p = a.permission
-      print(if ((p & ACL.Read) == 0) "-" else "r")
-      print(if ((p & ACL.Write) == 0) "-" else "w")
-      print(if ((p & ACL.Create) == 0) "-" else "c")
-      print(if ((p & ACL.Delete) == 0) "-" else "d")
-      print(if ((p & ACL.Admin) == 0) "-" else "a")
-      println()
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
     }
+    parse(args, Map(
+          'params -> Seq("")))
+  }
+}
+
+private object SetACLCommand {
+  import Command._
+
+  val Usage = """usage: setacl [OPTIONS] PATH ACL[...]
+
+  Sets the ACL for the node specified by PATH.
+
+  At least one ACL entry must be provided, which must conform to the following
+  syntax: <scheme>:<id>=[rwcda*], where both <scheme> and <id> are optional and
+  any of [rwcda*] characters may be given as permissions. The permission values
+  are (r)ead, (w)rite, (c)reate, (d)elete, (a)dmin and all(*).
+
+  Unless otherwise specified, --set is assumed, which means that the given ACL
+  replaces the current ACL associated with the node at PATH. Both --add
+  and --remove options first query the current ACL before applying the
+  respective operation. Therefore, the entire operation is not atomic, though
+  specifying --version ensures that no intervening operations have changed the
+  state.
+
+options:
+  --add, -a                  : adds ACL to existing list
+  --remove, -r               : removes ACL from existing list
+  --set, -s                  : replaces existing list with ACL (default)
+  --version, -v VERSION      : version required to match in ZooKeeper
+  --force, -f                : forcefully set ACL regardless of version
+"""
+
+  def apply(zk: Zookeeper) = new Command {
+    private implicit val _zk = zk
+
+    def apply(cmd: String, args: Seq[String], context: Path): Path = {
+      val opts = parse(args)
+      val action = opts('action).asInstanceOf[Symbol]
+      val version = {
+        val force = opts('force).asInstanceOf[Boolean]
+        if (force) None
+        else opts('version).asInstanceOf[Option[Int]] match {
+          case None => error("version must be specified; otherwise use --force")
+          case v => v
+        }
+      }
+      val params = opts('params).asInstanceOf[Seq[String]]
+      val path = if (params.isEmpty) error("path must be specified") else params.head
+      val acl = params.tail match {
+        case Seq() => error("ACL must be specified")
+        case acls => acls map { acl =>
+          ACL parse acl match {
+            case Some(a) => a
+            case _ => error(acl + ": invalid ACL syntax")
+          }
+        }
+      }
+      val node = Node(context resolve path)
+      val (curACL, _) = try node.getACL() catch {
+        case _: NoNodeException => error(node.path + ": no such node")
+      }
+      val newACL = action match {
+        case 'add => (toMap(curACL) /: acl) { case (c, a) => c + (a.id -> a) }.values.toSeq
+        case 'remove => (toMap(curACL) /: acl) { case (c, a) => c - a.id }.values.toSeq
+        case 'set => acl
+      }
+      if (newACL.isEmpty) error("new ACL would be empty")
+      try node.setACL(newACL, version) catch {
+        case _: NoNodeException => error(node.path + ": no such node")
+        case _: BadVersionException => error(version.get + ": version does not match")
+        case _: InvalidACLException => error(newACL.mkString(",") + ": invalid ACL")
+      }
+      context
+    }
+
+    private def toMap(acl: Seq[ACL]): Map[Id, ACL] =
+      (Map[Id, ACL]() /: acl) { case (m, a) => m + (a.id -> a) }
+  }
+
+  private def parse(args: Seq[String]): Map[Symbol, Any] = {
+    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
+      if (args.isEmpty)
+        opts
+      else {
+        val arg = args.head
+        val rest = args.tail
+        arg match {
+          case "--" => opts + ('params -> rest)
+          case LongOption("add") | ShortOption("a") => parse(rest, opts + ('action -> 'add))
+          case LongOption("remove") | ShortOption("r") => parse(rest, opts + ('action -> 'remove))
+          case LongOption("set") | ShortOption("s") => parse(rest, opts + ('action -> 'set))
+          case LongOption("force") | ShortOption("f") => parse(rest, opts + ('force -> true))
+          case LongOption("version") | ShortOption("v") => rest.headOption match {
+            case Some(version) =>
+              val _version = try version.toInt catch {
+                case _: NumberFormatException => error(version + ": version must be an integer")
+              }
+              parse(rest.tail, opts + ('version -> Some(_version)))
+            case _ => error(arg + ": missing argument")
+          }
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
+          case _ => opts + ('params -> args)
+        }
+      }
+    }
+    parse(args, Map(
+          'action -> 'set,
+          'force -> false,
+          'version -> None,
+          'params -> Seq[String]()))
   }
 }
 
 private object CreateCommand {
+  import Command._
+
   val Usage = """usage: mk|create [OPTIONS] PATH [DATA]
 
   Creates the node specified by PATH with optional DATA.
@@ -715,11 +854,18 @@ private object CreateCommand {
   option can be used to create intermediate nodes, though the first existing
   node in PATH must not be ephemeral.
 
+  One or more optional ACL entries may be specified with --acl, which must
+  conform to the following syntax: <scheme>:<id>=[rwcda*], where both <scheme>
+  and <id> are optional and any of [rwcda*] characters may be given as
+  permissions. The permission values are (r)ead, (w)rite, (c)reate, (d)elete,
+  (a)dmin and all(*).
+
 options:
   --recursive, -r            : recursively create intermediate nodes
   --encoding, -e CHARSET     : charset used for encoding DATA (default=UTF-8)
   --sequential, -S           : appends sequence to node name
   --ephemeral, -E            : node automatically deleted when CLI exits
+  --acl, -A                  : ACL assigned to node (default=world:anyone=*)
 """
 
   private val UTF_8 = Charset forName "UTF-8"
@@ -728,34 +874,25 @@ options:
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
+      val opts = parse(args)
       val recurse = opts('recursive).asInstanceOf[Boolean]
       val disp = disposition(opts)
+      val acl = opts('acl).asInstanceOf[Seq[ACL]] match {
+        case Seq() => ACL.AnyoneAll
+        case a => a
+      }
       val params = opts('params).asInstanceOf[Seq[String]]
-      val path = if (params.isEmpty) {
-        println("path must be specified")
-        return context
-      } else
-        params.head
+      val path = if (params.isEmpty) error("path must be specified") else params.head
       val data = params.tail.headOption match {
         case Some(d) => d.headOption match {
           case Some('@') =>
             val name = d drop 1
             val file = try new FileInputStream(name) catch {
-              case _: FileNotFoundException =>
-                println(name + ": file not found")
-                return context
-              case _: SecurityException =>
-                println(name + ": access denied")
-                return context
+              case _: FileNotFoundException => error(name + ": file not found")
+              case _: SecurityException => error(name + ": access denied")
             }
             try read(file) catch {
-              case e: IOException =>
-                println(name + ": I/O error: " + e.getMessage)
-                return context
+              case e: IOException => error(name + ": I/O error: " + e.getMessage)
             } finally
               file.close()
           case _ => d getBytes opts('encoding).asInstanceOf[Charset]
@@ -767,17 +904,18 @@ options:
         if (recurse) {
           (Path("/") /: node.path.parts.tail.dropRight(1)) { case (parent, part) =>
             val node = Node(parent resolve part)
-            try node.create(Array(), ACL.EveryoneAll, Persistent) catch {
+            try node.create(Array(), ACL.AnyoneAll, Persistent) catch {
               case _: NodeExistsException =>
             }
             node.path
           }
         }
-        node.create(data, ACL.EveryoneAll, disp)
+        node.create(data, acl, disp)
       } catch {
-        case e: NodeExistsException => println(Path(e.getPath).normalize + ": node already exists")
-        case _: NoNodeException => println(node.parent.path + ": no such parent node")
-        case e: NoChildrenForEphemeralsException => println(Path(e.getPath).normalize + ": parent node is ephemeral")
+        case e: NodeExistsException => error(Path(e.getPath).normalize + ": node already exists")
+        case _: NoNodeException => error(node.parent.path + ": no such parent node")
+        case e: NoChildrenForEphemeralsException => error(Path(e.getPath).normalize + ": parent node is ephemeral")
+        case _: InvalidACLException => error(acl.mkString(",") + ": invalid ACL")
       }
       context
     }
@@ -813,14 +951,24 @@ options:
           case LongOption("encoding") | ShortOption("e") => rest.headOption match {
             case Some(charset) =>
               val cs = try Charset forName charset catch {
-                case _: UnsupportedCharsetException => throw new OptionException(charset + ": no such charset")
+                case _: UnsupportedCharsetException => error(charset + ": no such charset")
               }
               parse(rest.tail, opts + ('encoding -> cs))
-            case _ => throw new OptionException(arg + ": missing argument")
+            case _ => error(arg + ": missing argument")
           }
           case LongOption("sequential") | ShortOption("S") => parse(rest, opts + ('sequential -> true))
           case LongOption("ephemeral") | ShortOption("E") => parse(rest, opts + ('ephemeral -> true))
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption("acl") | ShortOption("A") => rest.headOption match {
+            case Some(acl) =>
+              val _acl = ACL parse acl match {
+                case Some(a) => a
+                case _ => error(acl + ": invalid ACL syntax")
+              }
+              val acls = opts('acl).asInstanceOf[Seq[ACL]] :+ _acl
+              parse(rest.tail, opts + ('acl -> acls))
+            case _ => error(arg + ": missing argument")
+          }
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -830,11 +978,14 @@ options:
           'encoding -> UTF_8,
           'sequential -> false,
           'ephemeral -> false,
+          'acl -> Seq[ACL](),
           'params -> Seq[String]()))
   }
 }
 
 private object DeleteCommand {
+  import Command._
+
   val Usage = """usage: rm|del [OPTIONS] PATH
 
   Deletes the node specified by PATH.
@@ -854,30 +1005,25 @@ options:
     private implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = try parse(args) catch {
-        case e: OptionException => println(e.getMessage)
-        return context
-      }
+      val opts = parse(args)
       val recurse = opts('recursive).asInstanceOf[Boolean]
-      val force = opts('force).asInstanceOf[Boolean]
-      val version = opts('version).asInstanceOf[Option[Int]]
-      val params = opts('params).asInstanceOf[Seq[String]]
-      val path = if (params.isEmpty) {
-        println("path must be specified")
-        return context
-      } else
-        params.head
-      if (!force && version.isEmpty) {
-        println("version must be specified; otherwise use --force")
-        return context
+      val version = {
+        val force = opts('force).asInstanceOf[Boolean]
+        if (force) None
+        else opts('version).asInstanceOf[Option[Int]] match {
+          case None => error("version must be specified; otherwise use --force")
+          case v => v
+        }
       }
+      val params = opts('params).asInstanceOf[Seq[String]]
+      val path = if (params.isEmpty) error("path must be specified") else params.head
       val node = Node(context resolve path)
       try {
-        node.delete(if (force) None else version)
+        node.delete(version)
       } catch {
-        case _: NoNodeException => println(node.path + ": no such node")
-        case _: BadVersionException => println(version.get + ": version does not match")
-        case _: NotEmptyException => println(node.path + ": node has children")
+        case _: NoNodeException => error(node.path + ": no such node")
+        case _: BadVersionException => error(version.get + ": version does not match")
+        case _: NotEmptyException => error(node.path + ": node has children")
       }
       context
     }
@@ -897,12 +1043,12 @@ options:
           case LongOption("version") | ShortOption("v") => rest.headOption match {
             case Some(version) =>
               val _version = try version.toInt catch {
-                case _: NumberFormatException => throw new OptionException(version + ": version must be an integer")
+                case _: NumberFormatException => error(version + ": version must be an integer")
               }
               parse(rest.tail, opts + ('version -> Some(_version)))
-            case _ => throw new OptionException(arg + ": missing argument")
+            case _ => error(arg + ": missing argument")
           }
-          case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
+          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
           case _ => opts + ('params -> args)
         }
       }
@@ -952,6 +1098,7 @@ commands:
   mk, create     create new node
   rm, del        delete existing node
   getacl         get node ACL
+  setacl         set node ACL
   config         show connection information and session state
   help, ?        show available commands
   exit, quit     exit program
@@ -969,6 +1116,7 @@ commands:
         "rm" -> DeleteCommand.Usage,
         "del" -> DeleteCommand.Usage,
         "getacl" -> GetACLCommand.Usage,
+        "setacl" -> SetACLCommand.Usage,
         "config" -> ConfigCommand.Usage,
         "help" -> HelpCommand.Usage,
         "exit" -> QuitCommand.Usage,
