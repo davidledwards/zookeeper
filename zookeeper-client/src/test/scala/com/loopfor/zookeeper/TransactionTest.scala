@@ -10,10 +10,10 @@ object TransactionTest {
     }
     val zk = SynchronousZookeeper(config)
     try {
-      val ops = CreateOperation("/tr", Array(), ACL.EveryoneAll, PersistentSequential) ::
+      val ops = CreateOperation("/tr", Array(), ACL.AnyoneAll, PersistentSequential) ::
                 CheckOperation("/foo", None) ::
                 CheckOperation("/foobar", None) ::
-                CreateOperation("/tr", Array(), ACL.EveryoneAll, PersistentSequential) ::
+                CreateOperation("/tr", Array(), ACL.AnyoneAll, PersistentSequential) ::
                 Nil
       zk transact ops match {
         case Right(rs) =>

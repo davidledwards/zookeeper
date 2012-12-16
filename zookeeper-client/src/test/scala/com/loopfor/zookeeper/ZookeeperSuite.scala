@@ -17,7 +17,7 @@ abstract class ZookeeperSuite extends FunSuite with BeforeAndAfterAll {
   }
 
   override protected def withFixture(test: OneArgTest) {
-    val root = zk.sync.create("/test_", Array(), ACL.EveryoneAll, PersistentSequential)
+    val root = zk.sync.create("/test_", Array(), ACL.AnyoneAll, PersistentSequential)
     super.withFixture(test.toNoArgTest(Path(root)))
   }
 }

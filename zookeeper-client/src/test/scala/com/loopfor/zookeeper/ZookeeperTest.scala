@@ -23,7 +23,7 @@ object ZookeeperTest {
     val zk = SynchronousZookeeper(config)
     try {
       val result = Try {
-        zk.create("/test_", Array(), ACL.EveryoneAll, PersistentSequential)
+        zk.create("/test_", Array(), ACL.AnyoneAll, PersistentSequential)
       }
       result match {
         case Success(path) =>

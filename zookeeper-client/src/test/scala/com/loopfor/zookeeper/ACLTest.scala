@@ -5,17 +5,13 @@ import org.scalatest.FunSuite
 import scala.language._
 
 class ACLTest extends FunSuite {
-  private val TestScheme = "testscheme"
-  private val TestId = "testid"
-  private val TestPerm = Read | Write | Create
-
   test("Id pattern matching") {
     Id("foo", "bar") match {
       case Id("foo", "bar") =>
     }
   }
 
-  test("Id pattern matching with strings") {
+  test("Id parsing") {
     val tests = Seq(
           ("foo:bar", "foo", "bar"),
           ("foo:", "foo", ""),
@@ -23,43 +19,39 @@ class ACLTest extends FunSuite {
           (":", "", ""))
 
     tests foreach { case (s, scheme, id) =>
-      s match {
-        case Id(s, i) =>
-          assert(s === scheme)
-          assert(i === id)
+      Id parse s match {
+        case Some(i) =>
+          assert(i.scheme === scheme)
+          assert(i.id === id)
+        case _ => fail(s)
       }
-    }
-
-    "foo" match {
-      case Id(_, _) => fail()
-      case _ =>
     }
   }
 
-  test("Id pattern matching with invalid strings") {
-    "foo" match {
-      case Id(_, _) => fail()
+  test("Id parsing with invalid strings") {
+    Id parse "foo" match {
+      case Some(_) => fail()
       case _ =>
     }
   }
 
   test("equivalence of Id with underlying ZooKeeper Id") {
-    val id = Id(TestScheme, TestId)
+    val id = Id("foo", "bar")
     val zid = Id.toId(id)
     assert(id.scheme === zid.getScheme())
     assert(id.id === zid.getId())
   }
 
   test("ACL pattern matching") {
-    ACL(TestScheme, TestId, Read) match {
-      case ACL(Id(TestScheme, TestId), Read) => ()
+    ACL("foo", "bar", Read) match {
+      case ACL(Id("foo", "bar"), Read) =>
     }
-    ACL(Id(TestScheme, TestId), All) match {
-      case ACL(Id(TestScheme, TestId), All) => ()
+    ACL(Id("foo", "bar"), All) match {
+      case ACL(Id("foo", "bar"), All) =>
     }
   }
 
-  test("ACL pattern matching with strings") {
+  test("ACL parsing") {
     val tests = Seq(
           ("foo:bar=", 0),
           ("foo:bar=r", Read),
@@ -69,27 +61,30 @@ class ACLTest extends FunSuite {
           ("foo:bar=rwcda", Read | Write | Create | Delete | Admin),
           ("foo:bar=*", Read | Write | Create | Delete | Admin))
 
-    tests foreach { case (acl, permission) =>
-      acl match {
-        case ACL(Id(_), p) => assert(p === permission)
+    tests foreach { case (s, permission) =>
+      ACL parse s match {
+        case Some(acl) => assert(acl.permission === permission)
+        case _ => fail(s)
       }
     }
   }
 
-  test("ACL pattern matching with invalid strings") {
+  test("ACL parsing with invalid strings") {
     val tests = Seq(
           "foo:bar",
           "foo:bar=x",
           "foo:bar=rwcdax")
 
-    tests foreach { acl => acl match {
-      case ACL(_, _) => fail()
-      case _ =>
-    }}
+    tests foreach { s =>
+      ACL parse s match {
+        case Some(_) => fail(s)
+        case _ =>
+      }
+    }
   }
 
   test("equivalence of ACL with underlying ZooKeeper ACL") {
-    val acl = ACL(TestScheme, TestId, Read | Write)
+    val acl = ACL("foo", "bar", Read | Write)
     val zacl = ACL.toZACL(acl)
     assert(acl.id.scheme === zacl.getId.getScheme)
     assert(acl.id.id === zacl.getId.getId)
@@ -97,20 +92,33 @@ class ACLTest extends FunSuite {
   }
 
   test("ACL construction from Id") {
-    val acl = Id(TestScheme, TestId) permit TestPerm
+    val perm = Read | Write
+    val acl = Id("foo", "bar") permit perm
     acl match {
-      case ACL(Id(TestScheme, TestId), TestPerm) => ()
+      case ACL(Id("foo", "bar"), perm) =>
     }
   }
 
   test("implicit construction of Id") {
-    val id: Id = (TestScheme, TestId)
+    val perm = Create | Delete
+    val id: Id = ("foo", "bar")
     id match {
-      case Id(TestScheme, TestId) => ()
+      case Id("foo", "bar") =>
     }
-    val acl = (TestScheme, TestId) permit TestPerm
+    val acl = ("foo", "bar") permit perm
     acl match {
-      case ACL(Id(TestScheme, TestId), TestPerm) => ()
+      case ACL(Id("foo", "bar"), perm) =>
     }
+  }
+
+  test("equality and hash") {
+    val a = Id("foo", "bar")
+    val b = Id("foo", "bar")
+    assert(a === b)
+    assert(a.hashCode === b.hashCode)
+
+    val c = Id("foo", "baz")
+    assert(a != c)
+    assert(a.hashCode != c.hashCode)
   }
 }
