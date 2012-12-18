@@ -255,7 +255,7 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
   def get(path: String): (Array[Byte], Status) = {
     val stat = new Stat
     val data = zk.getData(path, false, stat)
-    (data, Status(path, stat))
+    (if (data == null) Array() else data, Status(path, stat))
   }
 
   def set(path: String, data: Array[Byte], version: Option[Int]): Status = {
@@ -328,7 +328,7 @@ private class SynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: 
   def get(path: String): (Array[Byte], Status) = {
     val stat = new Stat
     val data = zk.getData(path, watcher, stat)
-    (data, Status(path, stat))
+    (if (data == null) Array() else data, Status(path, stat))
   }
 
   def exists(path: String): Option[Status] = {
@@ -453,7 +453,7 @@ private object DataHandler {
   def apply(p: Promise[(Array[Byte], Status)]) = new AsyncCallback.DataCallback {
     def processResult(rc: Int, path: String, context: Object, data: Array[Byte], stat: Stat) {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (data, Status(path, stat))
+        case Code.OK => p success (if (data == null) Array() else data, Status(path, stat))
         case code => p failure ZException.create(code)
       }
     }
