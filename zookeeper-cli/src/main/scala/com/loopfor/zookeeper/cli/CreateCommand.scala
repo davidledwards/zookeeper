@@ -2,7 +2,7 @@ package com.loopfor.zookeeper.cli
 
 import com.loopfor.zookeeper._
 import java.io.{FileInputStream, FileNotFoundException, IOException}
-import java.nio.charset.{Charset, UnsupportedCharsetException}
+import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuilder
 
@@ -124,7 +124,7 @@ options:
           case LongOption("encoding") | ShortOption("e") => rest.headOption match {
             case Some(charset) =>
               val cs = try Charset forName charset catch {
-                case _: UnsupportedCharsetException => error(charset + ": no such charset")
+                case _: IllegalArgumentException => error(charset + ": no such charset")
               }
               parse(rest.tail, opts + ('encoding -> cs))
             case _ => error(arg + ": missing argument")

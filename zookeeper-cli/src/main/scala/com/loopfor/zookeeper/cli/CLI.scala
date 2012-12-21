@@ -1,12 +1,14 @@
 package com.loopfor.zookeeper.cli
 
 import com.loopfor.zookeeper._
-import java.io.IOException
+import java.io.{BufferedReader, FileInputStream, FileNotFoundException, IOException, InputStream, InputStreamReader}
 import java.net.InetSocketAddress
+import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.language._
+import scala.collection.mutable.ArrayBuffer
 
 object CLI {
   def main(args: Array[String]) {
@@ -29,11 +31,18 @@ object CLI {
   An interactive client capable of connecting to a ZooKeeper cluster. At least
   one SERVER in the cluster must be specified, which is defined as `host:port`.
 
-options:
+configuration options:
   --path, -p                 : root path (default=/)
-  --timeout, -t SECONDS      : session timeout (default=0)
+  --timeout, -t SECONDS      : session timeout (default=60)
   --readonly, -r             : allow readonly connection
+
+command options:
+  --command, -c COMMAND      : execute COMMAND
+  --file, -f FILE            : execute commands in FILE
+  --encoding, -e CHARSET     : charset applicable to FILE (default=UTF-8)
 """
+
+  private val UTF_8 = Charset forName "UTF-8"
 
   private def run(args: Array[String]): Int = {
     import Console.err
@@ -82,6 +91,38 @@ options:
     val timeout = opts('timeout).asInstanceOf[Int] seconds
     val readonly = opts('readonly).asInstanceOf[Boolean]
 
+    def read(file: InputStream, cs: Charset): Seq[String] = {
+      val f = new BufferedReader(new InputStreamReader(file, cs))
+      @tailrec def read(cmds: ArrayBuffer[String]): Seq[String] = {
+        val line = f.readLine()
+        if (line == null) cmds.toSeq else read(cmds += line)
+      }
+      read(ArrayBuffer.empty)
+    }
+
+    val cmds = {
+      opts('file).asInstanceOf[Option[String]] match {
+        case Some(name) =>
+          val file = try new FileInputStream(name) catch {
+            case _: FileNotFoundException =>
+              println(name + ": file not found")
+              return 1
+            case _: SecurityException =>
+              println(name + ": access denied")
+              return 1
+          }
+          try read(file, opts('encoding).asInstanceOf[Charset]) catch {
+            case e: IOException =>
+              println(name + ": I/O error: " + e.getMessage)
+              return 1
+          } finally file.close()
+        case _ => opts('command).asInstanceOf[Option[String]] match {
+          case Some(cmd) => Seq(cmd)
+          case _ => null
+        }
+      }
+    }
+
     val state = new AtomicReference[StateEvent](Disconnected)
     val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly) withWatcher {
       (event, session) => state set event
@@ -118,36 +159,59 @@ options:
       }
     }
 
-    val reader = Reader(commands.keySet, zk)
+    cmds match {
+      case null =>
+        val reader = Reader(commands.keySet, zk)
 
-    @tailrec def process(context: Path) {
-      if (context != null) {
-        val args = reader(context)
-        val _context = try {
-          if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
-        } catch {
-          case e: CommandException =>
-            println(e.getMessage)
-            context
-          case _: ConnectionLossException =>
-            println("connection lost")
-            context
-          case _: SessionExpiredException =>
-            println("session has expired; `exit` and restart CLI")
-            context
-          case _: NoAuthException =>
-            println("not authorized")
-            context
-          case e: KeeperException =>
-            println("internal zookeeper error: " + e.getMessage)
-            context
+        @tailrec def process(context: Path) {
+          if (context != null) {
+            val args = reader(context)
+            val _context = try {
+              if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
+            } catch {
+              case e: CommandException =>
+                println(e.getMessage)
+                context
+              case _: ConnectionLossException =>
+                println("connection lost")
+                context
+              case _: SessionExpiredException =>
+                println("session has expired; `exit` and restart CLI")
+                context
+              case _: NoAuthException =>
+                println("not authorized")
+                context
+              case e: KeeperException =>
+                println("internal zookeeper error: " + e.getMessage)
+                context
+            }
+            process(_context)
+          }
         }
-        process(_context)
-      }
+        process(Path("/"))
+        0
+      case cmds =>
+        (Path("/") /: cmds) { case (context, cmd) =>
+          val args = Splitter split cmd
+          try {
+            if (args.size > 0) commands(args.head)(args.head, args.tail, context) else context
+          } catch {
+            case e: CommandException =>
+              println(e.getMessage)
+              return 1
+            case _: ConnectionLossException =>
+              println("connection lost")
+              return 1
+            case _: SessionExpiredException =>
+              println("session has expired")
+              return 1
+            case e: KeeperException =>
+              println("internal zookeeper error: " + e.getMessage)
+              return 1
+          }
+        }
+        0
     }
-
-    process(Path("/"))
-    0
   }
 
   private def parse(args: Seq[String]): Map[Symbol, Any] = {
@@ -173,6 +237,22 @@ options:
             case _ => throw new OptionException(arg + ": missing argument")
           }
           case LongOption("readonly") | ShortOption("r") => parse(rest, opts + ('readonly -> true))
+          case LongOption("command") | ShortOption("c") => rest.headOption match {
+            case Some(command) => parse(rest.tail, opts + ('command -> Some(command)))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("file") | ShortOption("f") => rest.headOption match {
+            case Some(file) => parse(rest.tail, opts + ('file -> Some(file)))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
+          case LongOption("encoding") | ShortOption("e") => rest.headOption match {
+            case Some(charset) =>
+              val cs = try Charset forName charset catch {
+                case _: IllegalArgumentException => throw new OptionException(charset + ": no such charset")
+              }
+              parse(rest.tail, opts + ('encoding -> cs))
+            case _ => throw new OptionException(arg + ": missing argument")
+          }
           case LongOption(_) | ShortOption(_) => throw new OptionException(arg + ": no such option")
           case _ => opts + ('params -> args.toList)
         }
@@ -183,6 +263,9 @@ options:
           'path -> "",
           'timeout -> 60,
           'readonly -> false,
-          'params -> Seq("")))
+          'command -> None,
+          'file -> None,
+          'encoding -> UTF_8,
+          'params -> Seq[String]()))
   }
 }
