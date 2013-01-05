@@ -10,8 +10,8 @@ In order to build the corresponding artifacts, you must install [Java 1.6](http:
 higher and [Maven 3.0](http://maven.apache.org/download.cgi) or higher. There is no need to install Scala, as the compiler and
 runtime are automatically downloaded by Maven.
 
-In the root directory `zookeeper`, the following will command will build each of the subprojects and install them in your
-local Maven repository:
+In the root directory `zookeeper`, the following command will build each of the subprojects and install them in your local
+Maven repository:
 ```
 mvn install
 ```
@@ -59,10 +59,43 @@ sensitive to the current path context, so you only see relevant subpaths.
 Unlike `zkCli.sh`, the `zk` program supports relative node paths and the ability to essentially _cd_ to a path, thus setting
 a _current working path_. In all commands requiring paths, both absolute and relative forms may be given. An absolute path
 starts with `/`, so the _current working path_ is ignored. Otherwise, the relative path is resolved in the context of the
-_current working path_. Both `.` and `..` can be used in path expressions.
+_current working path_.
 
-### Examples
+Both `.` and `..` can be used in path expressions.
+
+### Invoking `zk`
+Show `zk` usage information.
 ```
-zk
+$ zk
 ```
-Shows usage information.
+
+Connect to a ZooKeeper cluster by specifying at least one of its servers.
+```
+$ zk localhost:2181
+```
+
+Specify a root path, akin to `chroot`.
+```
+$ zk --path /foo localhost:2181
+```
+
+Allow connection to a ZooKeeper server even if a quorum has not been established.
+```
+$ zk --readonly localhost:2181
+```
+
+Execute a command without entering the `zk` shell.
+```
+$ zk --command "get foo/bar" localhost:2181
+```
+
+### Using `zk`
+Get list of all commands.
+```
+zk> help
+```
+
+Get help for a specific command.
+```
+zk> help ls
+```
