@@ -76,17 +76,17 @@ $ zk localhost:2181
 
 Specify a root path, akin to `chroot`.
 ```
-$ zk --path /foo localhost:2181
+$ zk -p /foo localhost:2181
 ```
 
 Allow connection to a ZooKeeper server even if a quorum has not been established.
 ```
-$ zk --readonly localhost:2181
+$ zk -r localhost:2181
 ```
 
 Execute a command without entering the `zk` shell.
 ```
-$ zk --command "get foo/bar" localhost:2181
+$ zk -c "get foo/bar" localhost:2181
 ```
 
 ### Using `zk`
@@ -98,4 +98,60 @@ zk> help
 Get help for a specific command.
 ```
 zk> help ls
+```
+
+Change the current working path.
+```
+zk> cd foo/bar
+```
+
+Change the current working path to the parent.
+```
+zk> cd ..
+```
+
+Return to previous working path.
+```
+zk> cd -
+```
+
+Change the current working path to `/`.
+```
+zk> cd
+```
+
+Display the current working path.
+```
+zk> pwd
+```
+
+Show child nodes of the current working path.
+```
+zk> ls
+```
+
+Show child nodes for paths `foo` and `../bar`
+```
+zk> ls foo ../bar
+```
+
+Recursively show child nodes of entire ZooKeeper node space.
+```
+zk> ls -r /
+```
+
+Show child nodes in long format, which appends node names with `/` if it contains children or `*` if ephemeral, and in all
+cases, the node version.
+```
+zk> ls -l
+```
+
+Show configuration of `zk` connection to a ZooKeeper cluster, including the session state.
+```
+zk> config
+```
+
+Quit the program.
+```
+zk> quit
 ```
