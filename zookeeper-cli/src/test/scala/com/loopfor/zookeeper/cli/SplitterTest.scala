@@ -15,18 +15,19 @@
  */
 package com.loopfor.zookeeper.cli
 
-import com.loopfor.zookeeper._
+import org.scalatest.FunSuite
+import scala.language._
 
-object QuitCommand {
-  val Usage = """usage: exit|quit
+class SplitterTest extends FunSuite {
+  test("arguments without quotes") {
+    val tests = Seq(
+          ("foo", Seq("foo")),
+          ("foo bar", Seq("foo", "bar")),
+          ("foo bar --this -x --that --", Seq("foo", "bar", "--this", "-x", "--that", "--")))
 
-  Exits the CLI.
-"""
-
-  def apply(zk: Zookeeper) = new Command {
-    def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      zk.close()
-      null
+    tests foreach { case (s, args) =>
+      val _args = Splitter split s
+      assert(_args === args)
     }
   }
 }
