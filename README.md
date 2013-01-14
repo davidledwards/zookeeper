@@ -90,6 +90,7 @@ $ zk -c "get foo/bar" localhost:2181
 ```
 
 ### Using `zk`
+#### Getting help
 Get list of all commands.
 ```
 zk> help
@@ -100,6 +101,7 @@ Get help for a specific command.
 zk> help ls
 ```
 
+#### Working with node paths
 Change the current working path.
 ```
 zk> cd foo/bar
@@ -125,6 +127,7 @@ Display the current working path.
 zk> pwd
 ```
 
+#### Listing nodes
 Show child nodes of the current working path.
 ```
 zk> ls
@@ -146,6 +149,7 @@ cases, the node version.
 zk> ls -l
 ```
 
+#### Other useful commands
 Show configuration of `zk` connection to a ZooKeeper cluster, including the session state.
 ```
 zk> config
