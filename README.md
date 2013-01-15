@@ -149,6 +149,90 @@ cases, the node version.
 zk> ls -l
 ```
 
+#### Examining nodes
+Display hex/ASCII output of data associated with node at current working path.
+```
+zk> get
+```
+
+Display data of node `/foo/bar` as string encoded as `ISO-8859-1`.
+```
+zk> get -s -e iso-8859-1 /foo/bar
+```
+
+Show internal ZooKeeper state of nodes `this` and `that`.
+```
+zk> stat this that
+```
+
+Show ACL for node `/zookeeper`.
+```
+zk> getacl /zookeeper
+```
+
+#### Creating nodes
+Create node `foo` with no attached data.
+```
+zk> mk foo
+```
+
+Create node `/foo/bar/baz` and all intermediate nodes, if necessary.
+```
+zk> mk -r /foo/bar/baz
+```
+
+Create ephemeral node `lock_` with monotonically-increasing sequence appended to name.
+```
+zk> mk -E -S lock_
+```
+
+Create node `bar` with data `hello world` encoded as `UTF-16`.
+```
+zk> mk -e utf-16 "hello world"
+```
+
+#### Modifying nodes
+Set data of node `/foo/bar` as `goodbye world` whose current version in ZooKeeper is `19`.
+```
+zk> set -v 19 /foo/bar "goodbye world"
+```
+
+Set data of node `lock/master` with data from file `/tmp/master.bin` and version `31`.
+```
+zk> set -v 31 lock/master @/tmp/master.bin
+```
+
+Forcefully clear the data of node `this/that` without specifying the version.
+```
+zk> set -f this/that
+```
+
+Replace ACL of node `foo/bar` with `world:*` (all permissions) and version `17`.
+```
+zk> setacl -v 17 foo/bar world:*
+```
+
+Add ACL `world:rw` (read/write) to node `foo/bar`, ignoring version.
+```
+zk> setacl -a -f foo/bar world:rw
+```
+
+Remove ACL `world:rwcd` (read/write/create/delete) to node `foo/bar` with version `23`.
+```
+zk> setacl -r -v 23 foo/bar world:rwcd
+```
+
+#### Deleting nodes
+Delete node `/lock/master` whose current version in ZooKeeper is `7`.
+```
+zk> rm -v 7 /lock/master
+```
+
+Recursively delete node `instances` and its children, forcefully doing so without specifying the version.
+```
+zk> rm -r -f instances
+```
+
 #### Other useful commands
 Show configuration of `zk` connection to a ZooKeeper cluster, including the session state.
 ```
