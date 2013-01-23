@@ -157,9 +157,12 @@ object Path {
    */
   def apply(path: String): Path = new Impl(compress(path))
 
-  def unapply(path: Path): Option[String] =
-    if (path == null) None else Some(path.path)
-
+  /**
+   * Used in pattern matching to deconstruct a path.
+   * 
+   * @param path selector value
+   * @return a `Some` containing the [[Path.parts parts]] of `path` or `None` if `path` is `null`
+   */
   def unapplySeq(path: Path): Option[Seq[String]] =
     if (path == null) None else Some(path.parts)
 

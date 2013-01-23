@@ -109,7 +109,7 @@ trait SynchronousZookeeper extends Zookeeper {
   def delete(path: String, version: Option[Int]): Unit
 
   /**
-   * Returns the data and properties of the node specified by the given path.
+   * Returns the data and status of the node specified by the given path.
    * 
    * @param path the path of the node
    * @return a tuple containing the data and status of the node
@@ -132,7 +132,7 @@ trait SynchronousZookeeper extends Zookeeper {
   def set(path: String, data: Array[Byte], version: Option[Int]): Status
 
   /**
-   * Returns the properties of the node specified by the given path if it exists.
+   * Returns the status of the node specified by the given path if it exists.
    * 
    * @param path the path of the node
    * @return a `Some` containing the node status or `None` if the node does not exist
@@ -150,7 +150,7 @@ trait SynchronousZookeeper extends Zookeeper {
   def children(path: String): Seq[String]
 
   /**
-   * Returns the ACL and properties of the node specified by the given path.
+   * Returns the ACL and status of the node specified by the given path.
    * 
    * @param path the path of the node
    * @return a tuple containing the ACL and status of the node
@@ -213,8 +213,46 @@ trait SynchronousZookeeper extends Zookeeper {
  * A ZooKeeper client with ''synchronous'' and ''watchable'' operations.
  */
 trait SynchronousWatchableZookeeper extends Zookeeper {
+  /**
+   * Returns the data and status of the node specified by the given path and additionally sets a watch for any changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the data associated with the node changes
+   *  - the node is deleted
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return a tuple containing the data and status of the node
+   * 
+   * @throws NoNodeException if the node does not exist
+   */
   def get(path: String): (Array[Byte], Status)
+
+  /**
+   * Returns the status of the node specified by the given path if it exists and additionally sets a watch for any changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the data associated with the node changes
+   *  - the node is created
+   *  - the node is deleted
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return a `Some` containing the node status or `None` if the node does not exist
+   */
   def exists(path: String): Option[Status]
+
+  /**
+   * Returns the children of the node specified by the given path and additionally sets a watch for any changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return an unordered sequence containing the names of each child node
+   * 
+   * @throws NoNodeException if the node does not exist
+   */
   def children(path: String): Seq[String]
 }
 

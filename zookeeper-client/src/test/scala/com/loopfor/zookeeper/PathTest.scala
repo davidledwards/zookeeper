@@ -153,4 +153,18 @@ class PathTest extends FunSuite {
       case (p) => assert(Path(p).parentOption === None)
     }
   }
+
+  test("deconstruct paths") {
+    val tests = Seq(
+          ("", Seq()),
+          ("/", Seq("")),
+          ("foo/bar", Seq("foo", "bar")),
+          ("/foo/bar", Seq("", "foo", "bar")))
+
+    tests foreach {
+      case (p, e) => Path(p) match {
+        case Path(parts @ _*) => assert(parts === e)
+      }
+    }
+  }
 }
