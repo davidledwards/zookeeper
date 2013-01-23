@@ -20,18 +20,129 @@ import scala.collection.immutable.Stack
 import scala.collection.mutable.StringBuilder
 import scala.language._
 
+/**
+ * Represents an ''absolute'' or ''relative'' path to a node in ZooKeeper.
+ * 
+ * An ''absolute'' path starts with the `/` character. All other forms are considered ''relative''. Paths are virtually
+ * identical to those on Unix file systems and may include both `.` and `..` parts, indicating the current and parent node,
+ * respectively.
+ * 
+ * Examples:
+ * {{{
+ * "/"
+ * "../foo"
+ * "/foo/bar"
+ * "./foo/../bar"
+ * }}}
+ */
 trait Path {
+  /**
+   * Returns the name of the last part of the path.
+   * 
+   * Examples:
+   * {{{
+   * "" parent is ""
+   * "/" parent is ""
+   * "/foo" parent is "/"
+   * "/foo/bar" parent is "/foo"
+   * "foo/bar" parent is "foo"
+   * }}}
+   * 
+   * @return the last part of [[path]], which is an empty string if [[path]] is either `""` or `"/"`.
+   */
   def name: String
+
+  /**
+   * Returns the path.
+   * 
+   * @return the path
+   */
   def path: String
+
+  /**
+   * Returns the parent path.
+   * 
+   * @return the parent of [[path]]
+   * @throws NoSuchElementException if removal of [[name]] from [[path]] yields `""` or `"/"`
+   */
   def parent: Path
+
+  /**
+   * Returns the parent path wrapped in an `Option`.
+   * 
+   * @return a `Some` containing the parent of [[path]] or `None` if removal of [[name]] from [[path]] yields `""` or `"/"`
+   */
   def parentOption: Option[Path]
+
+  /**
+   * Returns a sequence containing the parts of the path.
+   * 
+   * Parts represent the node names sandwiched between `/` characters. An ''absolute'' path, which is prefixed with `/`, always
+   * yields a sequence containing an empty string as the first element. The path `""` contains no parts, hence an empty
+   * sequence is returned. In all other cases, parts are non-empty strings.
+   * 
+   * Examples:
+   * {{{
+   * "" parts ()
+   * "/" parts ("/")
+   * "/foo/bar" parts ("", "foo", "bar")
+   * "foo/bar" parts ("foo", "bar")
+   * }}}
+   * 
+   * @return a sequence containing the parts of [[path]]
+   */
   def parts: Seq[String]
+
+  /**
+   * Resolves the given `path` relative to this path.
+   * 
+   * Path resolution works as follows:
+   *  - if `path` is empty, return this [[path]]
+   *  - if `path` starts with `/`, return `path`
+   *  - if this [[path]] is empty, return `path`
+   *  - otherwise, return this [[path]] + `/` + `path`
+   * 
+   * @return a new path in which the given `path` is resolved relative to this [[path]]
+   */
   def resolve(path: String): Path
+
+  /**
+   * Resolves the given `path` relative to this path.
+   * 
+   * @return a new path in which the givne `path` is resolved relative to this [[path]]
+   */
   def resolve(path: Path): Path
+
+  /**
+   * Returns the normalized form of this path.
+   * 
+   * The normalization process entails the removal of `.` and `..` parts where possible.
+   * 
+   * Examples:
+   * {{{
+   * "/.." normalizes to "/"
+   * "/foo/.." normalizes to "/"
+   * "/foo/../bar" normalizes to "/bar"
+   * "./foo" normalizes to "foo"
+   * "foo/." normalizes to "foo"
+   * "foo/.." normalizes to ""
+   * "foo/./bar" normalizes to "foo/bar"
+   * "foo/../bar" normalizes to "bar"
+   * }}}
+   * 
+   * @return the normalized form of this path
+   */
   def normalize: Path
+
+  /**
+   * Returns `true` if the path is absolute.
+   */
   def isAbsolute: Boolean
 }
 
+/**
+ * Constructs and deconstructs [[Path]] values.
+ */
 object Path {
   def apply(path: String): Path = {
     new Impl(compress(path))
