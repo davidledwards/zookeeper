@@ -102,6 +102,7 @@ trait Path {
    *  - if this [[path]] is empty, return `path`
    *  - otherwise, return this [[path]] + `/` + `path`
    * 
+   * @param path the path to resolve against this [[path]]
    * @return a new path in which the given `path` is resolved relative to this [[path]]
    */
   def resolve(path: String): Path
@@ -109,6 +110,7 @@ trait Path {
   /**
    * Resolves the given `path` relative to this path.
    * 
+   * @param path the path to resolve against this [[path]]
    * @return a new path in which the givne `path` is resolved relative to this [[path]]
    */
   def resolve(path: Path): Path
@@ -144,17 +146,24 @@ trait Path {
  * Constructs and deconstructs [[Path]] values.
  */
 object Path {
-  def apply(path: String): Path = {
-    new Impl(compress(path))
-  }
+  /**
+   * Constructs a new path using the given path string.
+   * 
+   * Path construction entails removal of extraneous `/` characters, including those at the end of `path` so long as `path`
+   * itself is not equivalent to `"/"`.
+   * 
+   * @param path the path string
+   * @return a new path with the given `path` string
+   */
+  def apply(path: String): Path = new Impl(compress(path))
 
-  def unapply(path: Path): Option[String] = {
+  def unapply(path: Path): Option[String] =
     if (path == null) None else Some(path.path)
-  }
 
-  private def apply(parts: Seq[String]): Path = {
-    new Impl(parts mkString "/")
-  }
+  def unapplySeq(path: Path): Option[Seq[String]] =
+    if (path == null) None else Some(path.parts)
+
+  private def apply(parts: Seq[String]): Path = new Impl(parts mkString "/")
 
   private class Impl(val path: String) extends Path {
     lazy val name: String = parts.lastOption match {
