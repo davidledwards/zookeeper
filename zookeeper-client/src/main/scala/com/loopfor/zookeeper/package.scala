@@ -20,7 +20,7 @@ import org.apache.zookeeper.KeeperException
 import scala.language._
 
 /**
- * @todo package documentation goes here along with examples
+ * A Scala API for ZooKeeper.
  */
 package object zookeeper {
   type KeeperException = org.apache.zookeeper.KeeperException
@@ -46,6 +46,11 @@ package object zookeeper {
   type SystemErrorException = KeeperException.SystemErrorException
   type UnimplementedException = KeeperException.UnimplementedException
 
+  /**
+   * Converts the tuple (''host'',''port'') to an Internet socket address.
+   * 
+   * @return an `InetSocketAddress` composed from the given `addr` tuple
+   */
   implicit def tupleToInetSocketAddress(addr: (String, Int)): InetSocketAddress =
     new InetSocketAddress(addr._1, addr._2)
 }
