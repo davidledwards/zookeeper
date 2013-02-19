@@ -260,14 +260,117 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
  * A ZooKeeper client with ''asynchronous'' operations.
  */
 trait AsynchronousZookeeper extends Zookeeper {
+  /**
+   * Asynchronously creates a new node at the given path.
+   * 
+   * If a ''sequential'' [[Disposition disposition]] is provided in `disp`, then `path` is appended with a monotonically
+   * increasing sequence, thus guaranteeing that all sequential nodes are unique with `path` as their prefix.
+   * 
+   * @param path the path of the node to create
+   * @param data the data to associate with the node, which may be empty, but not `null`
+   * @param acl an access control list to apply to the node, which must not be empty
+   * @param disp the disposition of the node
+   * @return a future yielding the final path of the created node, which will differ from `path` if `disp` is either
+   * [[PersistentSequential]] or [[EphemeralSequential]]
+   */
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String]
+
+  /**
+   * Asynchronously deletes the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * @return a future, which upon success, yields `Unit`, otherwise one of the following exceptions:
+   *  - `NoNodeException` if the node does not exist
+   *  - `BadVersionException` if `version` is specified and does not match the node version
+   *  - `NotEmptyException` if the node contains children
+   */
   def delete(path: String, version: Option[Int]): Future[Unit]
+
+  /**
+   * Asynchronously gets the data and status of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return a future, which upon success, yeilds a tuple containing the data and status of the node, otherwise one of the
+   * following exceptions:
+   *  - NoNodeException if the node does not exist
+   */
   def get(path: String): Future[(Array[Byte], Status)]
+
+  /**
+   * Asynchronously sets the data for the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param data the data to associate with the node, which may be empty, but not `null`
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * @return a future, which upon success, yields the status of the node, otherwise one of the following exceptions:
+   *  - NoNodeException if the node does not exist
+   *  - BadVersionException if `version` is specified and does not match the node version
+   */
   def set(path: String, data: Array[Byte], version: Option[Int]): Future[Status]
+
+  /**
+   * Asynchronously determines the status of the node specified by the given path if it exists.
+   * 
+   * @param path the path of the node
+   * @return a future yielding a `Some` containing the node status or `None` if the node does not exist
+   */
   def exists(path: String): Future[Option[Status]]
+
+  /**
+   * Asynchronously gets the children of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return a future, which upon success, yields an unordered sequence containing the names of each child node, otherwise one
+   * of the following exceptions:
+   *  - NoNodeException if the node does not exist
+   */
   def children(path: String): Future[(Seq[String], Status)]
+
+  /**
+   * Asynchronously gets the ACL and status of the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @return a future, which upon success, yields a tuple containing the ACL and status of the node, otherwise one of the
+   * following exceptions:
+   *  - NoNodeException if the node does not exist
+   */
   def getACL(path: String): Future[(Seq[ACL], Status)]
+
+  /**
+   * Asynchronously sets the ACL for the node specified by the given path.
+   * 
+   * @param path the path of the node
+   * @param acl an access control list to apply to the node, which must not be empty
+   * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
+   * @return a future, which upon success, yields the status of the node, otherwise one of the following conditions:
+   *  - NoNodeException if the node does not exist
+   *  - BadVersionException if `version` is specified and does not match the node version
+   */
   def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Status]
+
+  /**
+   * Returns an asynchronous client in which operations implicitly attach the specified watch function.
+   * 
+   * The partial function `fn` is invoked when a watch is triggered or the session state changes. This method is typically
+   * used in a transient manner to introduce a watch function prior to performing a watchable ZooKeeper operation.
+   * 
+   * Example:
+   * {{{
+   * val zk = AsynchronousZookeeper(config)
+   * val future = zk watch {
+   *   case e: NodeEvent => ...
+   *   case e: StateEvent => ...
+   * } get "/foo"
+   * ...
+   * future onSuccess {
+   *   case (data, node) => ...
+   * }
+   * future onFailure {
+   *   case e: NoNodeException => ...
+   * }
+   * }}}
+   */
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper
 }
 
@@ -275,8 +378,48 @@ trait AsynchronousZookeeper extends Zookeeper {
  * A ZooKeeper client with ''asynchronous'' and ''watchable'' operations.
  */
 trait AsynchronousWatchableZookeeper extends Zookeeper {
+  /**
+   * Asynchronously gets the data and status of the node specified by the given path and additionally sets a watch for any
+   * changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the data associated with the node changes
+   *  - the node is deleted
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return a future, which upon success, yields a tuple containing the data and status of the node, otherwise one of the
+   * following exceptions:
+   *  - NoNodeException if the node does not exist
+   */
   def get(path: String): Future[(Array[Byte], Status)]
+
+  /**
+   * Asynchronously determines the status of the node specified by the given path if it exists and additionally sets a watch
+   * for any changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the data associated with the node changes
+   *  - the node is created
+   *  - the node is deleted
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return a future yielding a `Some` containing the node status or `None` if the node does not exist
+   */
   def exists(path: String): Future[Option[Status]]
+
+  /**
+   * Asynchronously gets the children of the node specified by the given path and additionally sets a watch for any changes.
+   * 
+   * The watch is triggered when one of the following conditions occur:
+   *  - the session state changes
+   * 
+   * @param path the path of the node
+   * @return a future, which upon success, yields an unordered sequence containing the names of each child node, otherwise
+   * one of the following exceptions:
+   *  - NoNodeException if the node does not exist
+   */
   def children(path: String): Future[(Seq[String], Status)]
 }
 
