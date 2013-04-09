@@ -15,13 +15,11 @@
  */
 package com.loopfor.zookeeper.cli
 
+import com.loopfor.scalop._
 import com.loopfor.zookeeper._
-import scala.annotation.tailrec
 import scala.language._
 
 object ListCommand {
-  import Command._
-
   val Usage= """usage: ls|dir [OPTIONS] [PATH...]
 
   List child nodes for each PATH. PATH may be omitted, in which case the
@@ -39,24 +37,28 @@ options:
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
+    private lazy val parser =
+      ("recursive", 'r') ~> enable ~~ false ++
+      ("long", 'l') ~> set(formatLong _) ~~ formatShort _
+
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parse(args)
-      val recurse = opts('recursive).asInstanceOf[Boolean]
-      val format = opts('format).asInstanceOf[(Node, Int) => String]
-      val paths = opts('params).asInstanceOf[Seq[String]]
+      val opts = parser parse args
+      val recurse = opts[Boolean]("recursive")
+      val format  = opts[(Node, Int) => String]("long")
+      val paths = if (opts.args.size > 0) opts.args else Seq("")
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         try {
           val children = node.children() sortBy { _.name }
-          if (count > 1) println(node.path + ":")
+          if (count > 1) println(s"${node.path}:")
           if (recurse)
             traverse(children, 0, format)
           else
             children foreach { child => println(format(child, 0)) }
           if (count > 1 && i < count) println()
         } catch {
-          case _: NoNodeException => println(node.path + ": no such node")
+          case _: NoNodeException => println(s"${node.path}: no such node")
         }
         i + 1
       }
@@ -90,27 +92,5 @@ options:
         case _: NoNodeException =>
       }
     }
-  }
-
-  private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
-      if (args.isEmpty)
-        opts
-      else {
-        val arg = args.head
-        val rest = args.tail
-        arg match {
-          case "--" => opts + ('params -> rest)
-          case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
-          case LongOption("long") | ShortOption("l") => parse(rest, opts + ('format -> formatLong _))
-          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
-          case _ => opts + ('params -> args)
-        }
-      }
-    }
-    parse(args, Map(
-          'recursive -> false,
-          'format -> formatShort _,
-          'params -> Seq("")))
   }
 }

@@ -15,12 +15,10 @@
  */
 package com.loopfor.zookeeper.cli
 
+import com.loopfor.scalop._
 import com.loopfor.zookeeper._
-import scala.annotation.tailrec
 
 object DeleteCommand {
-  import Command._
-
   val Usage = """usage: rm|del [OPTIONS] PATH
 
   Deletes the node specified by PATH.
@@ -39,59 +37,32 @@ options:
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
+    private lazy val parser =
+      ("recursive", 'r') ~> enable ~~ false ++
+      ("force", 'f') ~> enable ~~ false ++
+      ("version", 'v') ~> asSomeInt ~~ None
+
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parse(args)
-      val recurse = opts('recursive).asInstanceOf[Boolean]
+      val opts = parser parse args
+      val recurse = opts[Boolean]("recursive")
       val version = {
-        val force = opts('force).asInstanceOf[Boolean]
-        if (force) None
-        else opts('version).asInstanceOf[Option[Int]] match {
+        val force = opts[Boolean]("force")
+        if (force || recurse) None
+        else opts[Option[Int]]("version") match {
           case None => error("version must be specified; otherwise use --force")
           case v => v
         }
       }
-      val params = opts('params).asInstanceOf[Seq[String]]
-      val path = if (params.isEmpty) error("path must be specified") else params.head
+      val path = if (opts.args.isEmpty) error("path must be specified") else opts.args.head
       val node = Node(context resolve path)
       try {
         node.delete(version)
       } catch {
-        case _: NoNodeException => error(node.path + ": no such node")
-        case _: BadVersionException => error(version.get + ": version does not match")
-        case _: NotEmptyException => error(node.path + ": node has children")
+        case _: NoNodeException => error(s"${node.path}: no such node")
+        case _: BadVersionException => error(s"${version.get}: version does not match")
+        case _: NotEmptyException => error(s"${node.path}: node has children")
       }
       context
     }
-  }
-
-  private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
-      if (args.isEmpty)
-        opts
-      else {
-        val arg = args.head
-        val rest = args.tail
-        arg match {
-          case "--" => opts + ('params -> rest)
-          case LongOption("recursive") | ShortOption("r") => parse(rest, opts + ('recursive -> true))
-          case LongOption("force") | ShortOption("f") => parse(rest, opts + ('force -> true))
-          case LongOption("version") | ShortOption("v") => rest.headOption match {
-            case Some(version) =>
-              val _version = try version.toInt catch {
-                case _: NumberFormatException => error(version + ": version must be an integer")
-              }
-              parse(rest.tail, opts + ('version -> Some(_version)))
-            case _ => error(arg + ": missing argument")
-          }
-          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
-          case _ => opts + ('params -> args)
-        }
-      }
-    }
-    parse(args, Map(
-          'recursive -> false,
-          'force -> false,
-          'version -> None,
-          'params -> Seq[String]()))
   }
 }

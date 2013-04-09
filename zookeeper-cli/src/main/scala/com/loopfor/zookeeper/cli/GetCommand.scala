@@ -15,14 +15,13 @@
  */
 package com.loopfor.zookeeper.cli
 
+import com.loopfor.scalop._
 import com.loopfor.zookeeper._
 import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.language._
 
 object GetCommand {
-  import Command._
-
   val Usage = """usage: get [OPTIONS] [PATH...]
 
   Gets the data for the node specified by each PATH. PATH may be omitted, in
@@ -43,25 +42,35 @@ options:
 
   private val UTF_8 = Charset forName "UTF-8"
 
-  private type DisplayFunction = (Array[Byte], Map[Symbol, Any]) => Unit
+  private type DisplayFunction = (Array[Byte], OptResult) => Unit
 
   def apply(zk: Zookeeper) = new Command {
     private implicit val _zk = zk
 
+    private lazy val parser =
+      ("hex", 'h') ~> enable ~~ false ++
+      ("string", 's') ~> enable ~~ false ++
+      ("binary", 'b') ~> enable ~~ false ++
+      ("encoding", 'e') ~> asCharset ~~ UTF_8
+
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parse(args)
-      val display = opts('display).asInstanceOf[DisplayFunction]
-      val paths = opts('params).asInstanceOf[Seq[String]]
+      val opts = parser parse args
+      val display =
+        if (opts[Boolean]("hex")) displayHex _
+        else if (opts[Boolean]("binary")) displayBinary _
+        else if (opts[Boolean]("string")) displayString _
+        else displayHex _
+      val paths = if (opts.args.size > 0) opts.args else Seq("")
       val count = paths.size
       (1 /: paths) { case (i, path) =>
         val node = Node(context resolve path)
         try {
           val (data, status) = node.get()
-          if (count > 1) println(node.path + ":")
+          if (count > 1) println(s"${node.path}:")
           display(data, opts)
           if (count > 1 && i < count) println()
         } catch {
-          case _: NoNodeException => println(node.path + ": no such node")
+          case _: NoNodeException => println(s"${node.path}: no such node")
         }
         i + 1
       }
@@ -69,38 +78,7 @@ options:
     }
   }
 
-  private def parse(args: Seq[String]): Map[Symbol, Any] = {
-    @tailrec def parse(args: Seq[String], opts: Map[Symbol, Any]): Map[Symbol, Any] = {
-      if (args.isEmpty)
-        opts
-      else {
-        val arg = args.head
-        val rest = args.tail
-        arg match {
-          case "--" => opts + ('params -> rest)
-          case LongOption("hex") | ShortOption("h") => parse(rest, opts + ('display -> displayHex _))
-          case LongOption("string") | ShortOption("s") => parse(rest, opts + ('display -> displayString _))
-          case LongOption("binary") | ShortOption("b") => parse(rest, opts + ('display -> displayBinary _))
-          case LongOption("encoding") | ShortOption("e") => rest.headOption match {
-            case Some(charset) =>
-              val cs = try Charset forName charset catch {
-                case _: IllegalArgumentException => error(charset + ": no such charset")
-              }
-              parse(rest.tail, opts + ('encoding -> cs))
-            case _ => error(arg + ": missing argument")
-          }
-          case LongOption(_) | ShortOption(_) => error(arg + ": no such option")
-          case _ => opts + ('params -> args)
-        }
-      }
-    }
-    parse(args, Map(
-          'display -> displayHex _,
-          'encoding -> UTF_8,
-          'params -> Seq("")))
-  }
-
-  private def displayHex(data: Array[Byte], opts: Map[Symbol, Any]) {
+  private def displayHex(data: Array[Byte], opts: OptResult) {
     @tailrec def display(n: Int) {
       def charOf(b: Byte) = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
 
@@ -121,11 +99,11 @@ options:
     display(0)
   }
 
-  private def displayString(data: Array[Byte], opts: Map[Symbol, Any]) = {
-    val cs = opts('encoding).asInstanceOf[Charset]
+  private def displayString(data: Array[Byte], opts: OptResult) = {
+    val cs = opts[Charset]("encoding")
     println(new String(data, cs))
   }
 
-  private def displayBinary(data: Array[Byte], opts: Map[Symbol, Any]) =
+  private def displayBinary(data: Array[Byte], opts: OptResult) =
     Console.out.write(data, 0, data.length)
 }

@@ -76,7 +76,7 @@ commands:
         val cmd = args.head
         Commands get cmd match {
           case Some(usage) => println(usage)
-          case _ => println(cmd + ": no such command")
+          case _ => println(s"$cmd: no such command")
         }
       }
       context
