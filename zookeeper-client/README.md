@@ -1,21 +1,28 @@
-# Scala API/CLI for ZooKeeper
-A collection of Scala artifacts that make working with ZooKeeper enjoyable.
-
-## Projects
-* `zookeeper-client` - a functional API layered over the ZooKeeper client
-* `zookeeper-cli` - a much nicer command line program that replaces `zkCli.sh`
+# Scala API for ZooKeeper
+A functional API layered over the ZooKeeper client.
 
 ## Build Instructions
 In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/index.jsp) or
 higher and [Maven 3.0](http://maven.apache.org/download.cgi) or higher.
 
-In the root directory `zookeeper`, the following command will build each of the subprojects and install them in your local
-Maven repository:
+In the root directory `zookeeper-client`, the following command will build the project and install in your local Maven
+repository:
 ```
 mvn install
 ```
 
-You may also build specific subprojects by simply navigating to the appropriate subdirectory and running `mvn install`.
+API documentation can also be generated via:
+```
+mvn scala:doc
+```
+
+## Including as Maven Dependency
+```
+<dependency>
+   <groupId>com.loopfor.zookeeper</groupId>
+   <artifactId>zookeeper-client</artifactId>
+</dependency>
+```
 
 ## License
 Copyright 2013 David Edwards
