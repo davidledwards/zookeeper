@@ -58,6 +58,10 @@ publishMavenStyle := true
 
 publishArtifact in Test := false
 
+artifact in (Compile, packArchive) := Artifact(name.value, "tar", "tar.gz")
+
+addArtifact(artifact in (Compile, packArchive), packArchive)
+
 publishTo <<= version { v =>
   val repo = if (v endsWith "SNAPSHOT")
     "Sonatype Nexus Snapshot Repository" at "https://oss.sonatype.org/content/repositories/snapshots/"
