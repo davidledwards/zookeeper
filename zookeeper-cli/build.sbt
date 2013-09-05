@@ -1,5 +1,3 @@
-graphSettings
-
 name := "zookeeper-cli"
 
 organization := "com.loopfor.zookeeper"
@@ -51,6 +49,10 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "1.9.1" % "test"
 )
+
+packSettings
+
+packMain := Map("zk" -> "com.loopfor.zookeeper.cli.CLI")
 
 publishMavenStyle := true
 
