@@ -10,13 +10,11 @@ homepage := Some(url("https://github.com/davidledwards/zookeeper"))
 
 licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
-scmInfo <<= version { v =>
-  Some(ScmInfo(
-    url("https://github.com/davidledwards/zookeeper/tree/release-" + v + "/zookeeper-client"),
-    "scm:git:https://github.com/davidledwards/zookeeper.git",
-    Some("scm:git:https://github.com/davidledwards/zookeeper.git")
-  ))
-}
+scmInfo := Some(ScmInfo(
+  url("https://github.com/davidledwards/zookeeper/tree/release-" + version.value + "/zookeeper-client"),
+  "scm:git:https://github.com/davidledwards/zookeeper.git",
+  Some("scm:git:https://github.com/davidledwards/zookeeper.git")
+))
 
 scalaVersion := "2.10.2"
 
@@ -49,13 +47,12 @@ publishMavenStyle := true
 
 publishArtifact in Test := false
 
-publishTo <<= version { v =>
-  val repo = if (v endsWith "SNAPSHOT")
+publishTo := Some(
+  if (version.value endsWith "SNAPSHOT")
     "Sonatype Nexus Snapshot Repository" at "https://oss.sonatype.org/content/repositories/snapshots/"
   else
     "Sonatype Nexus Release Repository" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-  Some(repo)
-}
+)
 
 // Ensures that published POM has no repository dependencies.
 pomIncludeRepository := { _ => false }
