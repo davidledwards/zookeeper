@@ -4,29 +4,27 @@ cleaner and easier to use.
 
 ## Build Instructions
 In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/index.jsp) or
-higher and [Maven 3.0](http://maven.apache.org/download.cgi) or higher.
+higher and [sbt 0.13.0](http://www.scala-sbt.org/0.13.0/docs/Getting-Started/Setup.html).
 
-In the root directory `zookeeper-cli`, the following command will build the project and install in your local Maven repository:
+In the root directory `zookeeper-cli`, the following command will build the project and install in your local Ivy repository:
 ```
-mvn install
+sbt publish-local
 ```
 
 ## Installing the CLI
-A local build will install an assembly of the CLI in your local Maven repository, complete with all requisite dependencies.
+A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies.
 The only exception is Java 1.6, which must be separately installed on the target machine. The Scala runtime is included in the
 assembly, so there is no need for explicit installation.
 
-The location of the assembly is `M2_REPO/com/loopfor/zookeeper/zookeeper-cli/1.0-SNAPSHOT`. There are two identical versions
-of the assembly:
-* `zookeeper-cli-1.0-SNAPSHOT-bin.tar.gz`
-* `zookeeper-cli-1.0-SNAPSHOT-bin.zip`
+The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.1/tars/`.
+* `zookeeper-cli.tar.gz`
 
 Alternatively, these artifacts can be downloaded from the
 [Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/).
 
-Unzipping either of these assemblies will produce the following output:
+Unpacking this assembly will produce the following output:
 ```
-zookeeper-cli-1.0-SNAPSHOT/
+zookeeper-cli-1.1/
 + bin/
   + zk
   + ...
@@ -34,7 +32,7 @@ zookeeper-cli-1.0-SNAPSHOT/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.0-SNAPSHOT/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.1/bin/zk` in your PATH or create an alias.
 
 ## Helpful Tips
 The `zk` program uses [JLine](https://github.com/jline/jline2) for console input similar to what you might expect in

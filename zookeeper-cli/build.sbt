@@ -10,15 +10,16 @@ homepage := Some(url("https://github.com/davidledwards/zookeeper"))
 
 licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
-scmInfo <<= version { v =>
-  Some(ScmInfo(
-    url("https://github.com/davidledwards/zookeeper/tree/release-" + v + "/zookeeper-cli"),
-    "scm:git:https://github.com/davidledwards/zookeeper.git",
-    Some("scm:git:https://github.com/davidledwards/zookeeper.git")
-  ))
-}
+scmInfo := Some(ScmInfo(
+  url("https://github.com/davidledwards/zookeeper/tree/release-" + version.value + "/zookeeper-cli"),
+  "scm:git:https://github.com/davidledwards/zookeeper.git",
+  Some("scm:git:https://github.com/davidledwards/zookeeper.git")
+))
 
 scalaVersion := "2.10.2"
+
+// Disable since distributable artifact is a final assembly.
+crossPaths := false
 
 scalacOptions ++= Seq(
   "-deprecation",
@@ -50,25 +51,26 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "1.9.1" % "test"
 )
 
+// Merges sbt-pack settings.
 packSettings
 
 packMain := Map("zk" -> "com.loopfor.zookeeper.cli.CLI")
 
-publishMavenStyle := true
+publishMavenStyle := false
 
 publishArtifact in Test := false
 
+// Publishes the final assembly.
 artifact in (Compile, packArchive) := Artifact(name.value, "tar", "tar.gz")
 
 addArtifact(artifact in (Compile, packArchive), packArchive)
 
-publishTo <<= version { v =>
-  val repo = if (v endsWith "SNAPSHOT")
+publishTo := Some(
+  if (version.value endsWith "SNAPSHOT")
     "Sonatype Nexus Snapshot Repository" at "https://oss.sonatype.org/content/repositories/snapshots/"
   else
     "Sonatype Nexus Release Repository" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-  Some(repo)
-}
+)
 
 // Ensures that published POM has no repository dependencies.
 pomIncludeRepository := { _ => false }
