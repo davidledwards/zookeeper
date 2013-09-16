@@ -65,7 +65,7 @@ class NodeTest extends ZookeeperSuite {
           ("/foo/../../bar", "bar"))
 
     tests foreach {
-      case (p, e) => println(Node(p).name); assert(Node(p).name === e)
+      case (p, e) => assert(Node(p).name === e)
     }
   }
 
