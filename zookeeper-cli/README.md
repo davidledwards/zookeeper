@@ -20,7 +20,7 @@ The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-c
 * `zookeeper-cli.tar.gz`
 
 Alternatively, these artifacts can be downloaded from the
-[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/).
+[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.1/).
 
 Unpacking this assembly will produce the following output:
 ```
