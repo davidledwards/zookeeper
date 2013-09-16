@@ -8,7 +8,7 @@ higher and [sbt 0.13.0](http://www.scala-sbt.org/0.13.0/docs/Getting-Started/Set
 
 In the root directory `zookeeper-cli`, the following command will build the project and install in your local Ivy repository:
 ```
-sbt publish-local
+sbt publishLocal
 ```
 
 ## Installing the CLI

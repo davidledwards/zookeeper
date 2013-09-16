@@ -3,24 +3,33 @@ A functional API layered over the ZooKeeper client.
 
 ## Build Instructions
 In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/index.jsp) or
-higher and [Maven 3.0](http://maven.apache.org/download.cgi) or higher.
+higher and [sbt 0.13.0](http://www.scala-sbt.org/0.13.0/docs/Getting-Started/Setup.html).
 
-In the root directory `zookeeper-client`, the following command will build the project and install in your local Maven
+In the root directory `zookeeper-client`, the following command will build the project and install in your local Ivy
 repository:
 ```
-mvn install
+sbt publishLocal
 ```
 
-API documentation can also be generated via:
+API documentation is automatically generated and deployed with `publishLocal`, but may also be generated via:
 ```
-mvn scala:doc
+sbt doc
 ```
 
-## Including as Maven Dependency
+### Including as Dependency
+`zookeeper-client` is built against Scala 2.10.2.
+
+#### sbt
+```
+libraryDependencies += "com.loopfor.zookeeper" %% "zookeeper-client" % "1.1"
+```
+
+#### Maven
 ```
 <dependency>
    <groupId>com.loopfor.zookeeper</groupId>
-   <artifactId>zookeeper-client</artifactId>
+   <artifactId>zookeeper-client_2.10</artifactId>
+   <version>1.1</version>
 </dependency>
 ```
 
