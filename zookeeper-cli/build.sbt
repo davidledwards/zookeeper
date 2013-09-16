@@ -56,7 +56,7 @@ packSettings
 
 packMain := Map("zk" -> "com.loopfor.zookeeper.cli.CLI")
 
-publishMavenStyle := false
+publishMavenStyle := true
 
 publishArtifact in Test := false
 

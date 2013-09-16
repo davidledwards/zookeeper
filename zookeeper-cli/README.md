@@ -6,6 +6,8 @@ cleaner and easier to use.
 In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/index.jsp) or
 higher and [sbt 0.13.0](http://www.scala-sbt.org/0.13.0/docs/Getting-Started/Setup.html).
 
+Note that this project depends on `zookeeper-client`, so it must be built before proceeding.
+
 In the root directory `zookeeper-cli`, the following command will build the project and install in your local Ivy repository:
 ```
 sbt publishLocal
