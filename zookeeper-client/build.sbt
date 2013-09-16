@@ -2,7 +2,7 @@ name := "zookeeper-client"
 
 organization := "com.loopfor.zookeeper"
 
-version := "1.1-SNAPSHOT"
+version := "1.1"
 
 description := "Scala API for ZooKeeper"
 
