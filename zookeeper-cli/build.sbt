@@ -2,7 +2,7 @@ name := "zookeeper-cli"
 
 organization := "com.loopfor.zookeeper"
 
-version := "1.1"
+version := "1.2"
 
 description := "ZooKeeper CLI"
 
@@ -16,7 +16,7 @@ scmInfo := Some(ScmInfo(
   Some("scm:git:https://github.com/davidledwards/zookeeper.git")
 ))
 
-scalaVersion := "2.10.2"
+scalaVersion := "2.10.4"
 
 // Disable since distributable artifact is a final assembly.
 crossPaths := false
@@ -29,26 +29,22 @@ scalacOptions ++= Seq(
 )
 
 javacOptions ++= Seq(
-  "-source", "1.6",
-  "-target", "1.6"
+  "-source", "1.7",
+  "-target", "1.7"
 )
 
 // Compile dependencies.
 libraryDependencies ++= Seq(
-  "com.loopfor.zookeeper" %% "zookeeper-client" % "1.1",
+  "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2",
   "com.loopfor.scalop" %% "scalop" % "1.1",
-  "jline" % "jline" % "2.9"
-)
-
-// Runtime dependencies.
-libraryDependencies ++= Seq(
+  "jline" % "jline" % "2.11",
   "log4j" % "log4j" % "1.2.16" % "runtime"
     exclude("javax.jms", "jms")
 )
 
 // Test dependencies.
 libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "1.9.1" % "test"
+  "org.scalatest" %% "scalatest" % "2.1.3" % "test"
 )
 
 // Merges sbt-pack settings.

@@ -3,8 +3,8 @@ A new command line program designed to replace `zkCli.sh`, which comes with the 
 cleaner and easier to use.
 
 ## Build Instructions
-In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/index.jsp) or
-higher and [sbt 0.13.0](http://www.scala-sbt.org/0.13.0/docs/Getting-Started/Setup.html).
+In order to build the corresponding artifacts, you must install [Java 1.7](http://www.java.com/en/download/) or
+higher and [sbt 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html).
 
 Note that this project depends on `zookeeper-client`, so it must be built before proceeding.
 
@@ -15,26 +15,27 @@ sbt publishLocal
 
 ## Installing the CLI
 A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies.
-The only exception is Java 1.6, which must be separately installed on the target machine. The Scala runtime is included in the
+The only exception is Java 1.7, which must be separately installed on the target machine. The Scala runtime is included in the
 assembly, so there is no need for explicit installation.
 
-The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.1/tars/`.
+The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.2/tars/`.
 * `zookeeper-cli.tar.gz`
 
 Alternatively, these artifacts can be downloaded from the
-[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.1/).
+[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.2/).
 
 Unpacking this assembly will produce the following output:
 ```
-zookeeper-cli-1.1/
+zookeeper-cli-1.2/
 + bin/
   + zk
+  + zk.bat
   + ...
 + lib/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.1/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.2/bin/zk` in your PATH or create an alias.
 
 ## Helpful Tips
 The `zk` program uses [JLine](https://github.com/jline/jline2) for console input similar to what you might expect in
@@ -79,6 +80,11 @@ $ zk -r localhost:2181
 Execute a command without entering the `zk` shell.
 ```
 $ zk -c "get foo/bar" localhost:2181
+```
+
+The port number may be omitted if ZooKeeper servers are listening on port `2181`.
+```
+$ zk foo.com bar.com
 ```
 
 ## Using `zk`

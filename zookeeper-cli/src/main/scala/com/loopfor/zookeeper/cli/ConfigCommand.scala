@@ -16,7 +16,9 @@
 package com.loopfor.zookeeper.cli
 
 import com.loopfor.zookeeper._
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
+import org.apache.log4j.Level
 
 object ConfigCommand {
   val Usage = """usage: config
@@ -37,12 +39,19 @@ object ConfigCommand {
   be stopped before a new session can be established.
 """
 
-  def apply(config: Configuration, state: AtomicReference[StateEvent]) = new Command {
+  def apply(config: Configuration, log: Option[(File, Level)], state: AtomicReference[StateEvent]) = new Command {
     def apply(cmd: String, args: Seq[String], context: Path) = {
-      println("servers: " + (config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","))
-      println("path: " + Path("/").resolve(config.path).normalize)
-      println("timeout: " + config.timeout)
-      println("session: " + state.get)
+      val servers = config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","
+      val path = Path("/").resolve(config.path).normalize
+      val logfile = log match {
+        case Some((file, _)) => file.getAbsolutePath
+        case _ => "/dev/null"
+      }
+      println(s"servers: $servers")
+      println(s"path: $path")
+      println(s"timeout: ${config.timeout}")
+      println(s"session: ${state.get}")
+      println(s"log: $logfile")
       context
     }
   }

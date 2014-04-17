@@ -21,12 +21,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 object StatCommand {
-  val Usage = """usage stat|info [OPTIONS] [PATH...]
+  val Usage = """usage stat|info [PATH...]
 
   Gets the status for the node specified by each PATH. PATH may be omitted, in
   which case the current working path is assumed.
-
-options:
 """
 
   private val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")

@@ -17,45 +17,44 @@ package com.loopfor.zookeeper.cli
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
-import java.io.{BufferedReader, FileInputStream, FileNotFoundException, IOException, InputStream, InputStreamReader}
+import java.io.{BufferedReader, File, FileInputStream, FileNotFoundException, IOException, InputStream, InputStreamReader}
 import java.net.InetSocketAddress
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicReference
+import org.apache.log4j.{Level, LogManager, PropertyConfigurator}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.language._
 
-class CLIException(message: String) extends Exception(message)
-
 object CLI {
   def main(args: Array[String]) {
     import Console.err
-    try {
-      val status = run(args)
-      sys exit status
-    } catch {
+    val status = try run(args) catch {
       case e: OptException =>
         err println e.getMessage
-        sys exit 1
+        1
       case e: CLIException =>
         err println e.getMessage
-        sys exit 1
+        1
       case e: Exception =>
         err println s"internal error: ${e.getMessage}"
         err println ">> stack trace"
         e printStackTrace err
-        sys exit 1
+        1
     }
+    sys exit status
   }
 
   private val Usage = """usage: zk [OPTIONS] SERVER[...]
        zk [-? | --help]
 
-  An interactive client capable of connecting to a ZooKeeper cluster. At least
-  one SERVER in the cluster must be specified, which is defined as `host:port`.
+  An interactive client for a ZooKeeper cluster.
 
-configuration options:
+  At least one SERVER in the cluster must be specified, which is defined as
+  `host[:port]`. If `port` is unspecified, then 2181 is assumed.
+
+server options:
   --path, -p                 : root path (default=/)
   --timeout, -t SECONDS      : session timeout (default=60)
   --readonly, -r             : allow readonly connection
@@ -64,9 +63,126 @@ command options:
   --command, -c COMMAND      : execute COMMAND
   --file, -f FILE            : execute commands in FILE
   --encoding, -e CHARSET     : charset applicable to FILE (default=UTF-8)
+
+log options:
+  --log FILE                 : appends log messages to FILE
+                               (default=$HOME/zk.log)
+  --level LEVEL              : severity LEVEL of log messages
+                               one of: all, info, warn, error (default=warn)
+  --nolog                    : discard log messages
 """
 
   private val UTF_8 = Charset forName "UTF-8"
+  private val DefaultPort = 2181
+
+  private def run(args: Array[String]): Int = {
+    if (args.size == 0) {
+      println(Usage)
+      0
+    } else {
+      implicit val opts = parser parse args
+      if (help) {
+        println(Usage)
+        0
+      } else {
+        val rc = log match {
+          case Some((file, level)) =>
+            System.setProperty("zk.log", file.getAbsolutePath)
+            System.setProperty("zk.level", level.toString)
+            "log.properties"
+          case _ =>
+            "nolog.properties"
+        }
+        LogManager.resetConfiguration()
+        PropertyConfigurator configure Thread.currentThread.getContextClassLoader.getResource(rc)
+
+        val state = new AtomicReference[StateEvent](Disconnected)
+        val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly) withWatcher {
+          (event, session) => state set event
+        }
+        val zk = try Zookeeper(config) catch {
+          case e: IOException => CLIException(s"I/O error: ${e.getMessage}")
+        }
+
+        val verbs = Map(
+              "config" -> ConfigCommand(config, log, state),
+              "cd" -> CdCommand(zk),
+              "pwd" -> PwdCommand(zk),
+              "ls" -> ListCommand(zk),
+              "dir" -> ListCommand(zk),
+              "stat" -> StatCommand(zk),
+              "info" -> StatCommand(zk),
+              "get" -> GetCommand(zk),
+              "set" -> SetCommand(zk),
+              "getacl" -> GetACLCommand(zk),
+              "setacl" -> SetACLCommand(zk),
+              "mk" -> CreateCommand(zk),
+              "create" -> CreateCommand(zk),
+              "rm" -> DeleteCommand(zk),
+              "del" -> DeleteCommand(zk),
+              "quit" -> QuitCommand(zk),
+              "exit" -> QuitCommand(zk),
+              "help" -> HelpCommand(),
+              "?" -> HelpCommand()) withDefaultValue new Command {
+                def apply(cmd: String, args: Seq[String], context: Path): Path = {
+                  println(s"$cmd: no such command")
+                  context
+                }
+              }
+
+        def execute(args: Seq[String], context: Path): Option[Path] = {
+          if (args.size > 0) {
+            try Some(verbs(args.head)(args.head, args.tail, context)) catch {
+              case e: OptException =>
+                println(e.getMessage)
+                None
+              case e: CLIException =>
+                println(e.getMessage)
+                None
+              case _: ConnectionLossException =>
+                println("connection lost")
+                None
+              case _: SessionExpiredException =>
+                println("session has expired; `exit` and restart CLI")
+                None
+              case _: NoAuthException =>
+                println("not authorized")
+                None
+              case e: KeeperException =>
+                println(s"internal zookeeper error: ${e.getMessage}")
+                None
+            }
+          } else
+            Some(context)
+        }
+
+        commands match {
+          case Some(cmds) =>
+            @tailrec def process(cmds: Seq[String], context: Path): Int = cmds.headOption match {
+              case Some(cmd) =>
+                val args = Splitter split cmd
+                execute(args, context) match {
+                  case Some(_context) => if (_context == null) 0 else process(cmds.tail, _context)
+                  case None => 1
+                }
+              case None => 0
+            }
+            process(cmds, Path("/"))
+          case None =>
+            val reader = Reader(verbs.keySet, zk)
+            @tailrec def process(context: Path): Unit = {
+              val args = reader(context)
+              execute(args, context) match {
+                case Some(_context) => if (_context != null) process(_context)
+                case None => process(context)
+              }
+            }
+            process(Path("/"))
+            0
+        }
+      }
+    }
+  }
 
   private lazy val parser =
     ("help", '?') ~> enable ~~ false ++
@@ -75,39 +191,47 @@ command options:
     ("readonly", 'r') ~> enable ~~ false ++
     ("command", 'c') ~> asSomeString ~~ None ++
     ("file", 'f') ~> asSomeString ~~ None ++
-    ("encoding", 'e') ~> asCharset ~~ UTF_8
+    ("encoding", 'e') ~> asCharset ~~ UTF_8 ++
+    "log" ~> as { (arg, _) => Some(new File(arg)) } ~~ None ++
+    "level" ~> as { (arg, _) =>
+      Some(arg.toLowerCase match {
+        case "all" => Level.ALL
+        case "info" => Level.INFO
+        case "warn" => Level.WARN
+        case "error" => Level.ERROR
+        case _ => yell(s"$arg: must be one of (all, info, warn, error)")
+      })
+    } ~~ None ++
+    "nolog" ~> enable ~~ false
 
-  private def run(args: Array[String]): Int = {
-    if (args.size == 0) {
-      println(Usage)
-      return 0
+  private def help(implicit opts: OptResult): Boolean = opts("help")
+
+  private def servers(implicit opts: OptResult): Seq[InetSocketAddress] = opts.args match {
+    case Nil => CLIException("no servers specified")
+    case params => params map { server =>
+      val i = server indexOf ':'
+      val (host, port) =
+        if (i == -1) (server, DefaultPort)
+        else if (i == 0) CLIException(s"$server: missing host; expecting `host[:port]`")
+        else
+          (server take i,
+            server drop i + 1 match {
+              case "" => DefaultPort
+              case p => try p.toInt catch {
+                case _: NumberFormatException => CLIException(s"$server: port invalid; expecting `host[:port]`")
+              }
+            })
+      new InetSocketAddress(host, port)
     }
-    val opts = parser parse args
-    if (opts[Boolean]("help")) {
-      println(Usage)
-      return 0
-    }
+  }
 
-    val servers = opts.args match {
-      case Nil => error("no servers specified")
-      case params => params map { server =>
-        val i = server indexOf ':'
-        if (i == -1) error(s"$server: missing port; expecting `host:port`")
-        else if (i == 0) error(s"$server: missing host; expecting `host:port`")
-        else {
-          new InetSocketAddress(server take i, try {
-            (server drop i + 1).toInt
-          } catch {
-            case _: NumberFormatException => error(s"$server: port invalid; expecting `host:port`")
-          })
-        }
-      }
-    }
+  private def path(implicit opts: OptResult): String = opts("path")
 
-    val path = opts[String]("path")
-    val timeout = opts[Int]("timeout") seconds
-    val readonly = opts[Boolean]("readonly")
+  private def timeout(implicit opts: OptResult): Duration = opts[Int]("timeout") seconds
 
+  private def readonly(implicit opts: OptResult): Boolean = opts("readonly")
+
+  private def commands(implicit opts: OptResult): Option[Seq[String]] = {
     def read(file: InputStream, cs: Charset): Seq[String] = {
       val f = new BufferedReader(new InputStreamReader(file, cs))
       @tailrec def read(cmds: ArrayBuffer[String]): Seq[String] = {
@@ -116,123 +240,38 @@ command options:
       }
       read(ArrayBuffer.empty)
     }
-
-    val cmds = {
-      opts[Option[String]]("file") match {
-        case Some(name) =>
-          val file = try new FileInputStream(name) catch {
-            case _: FileNotFoundException => error(s"$name: file not found")
-            case _: SecurityException => error(s"$name: access denied")
-          }
-          try read(file, opts[Charset]("encoding")) catch {
-            case e: IOException => error(s"$name: I/O error: ${e.getMessage}")
-          } finally file.close()
-        case _ => opts[Option[String]]("command") match {
-          case Some(cmd) => Seq(cmd)
-          case _ => null
+    val cmds = opts[Option[String]]("file") match {
+      case Some(name) =>
+        val file = try new FileInputStream(name) catch {
+          case _: FileNotFoundException => CLIException(s"$name: file not found")
+          case _: SecurityException => CLIException(s"$name: access denied")
         }
+        try read(file, opts[Charset]("encoding")) catch {
+          case e: IOException => CLIException(s"$name: I/O error: ${e.getMessage}")
+        } finally file.close()
+      case _ => opts[Option[String]]("command") match {
+        case Some(cmd) => Seq(cmd)
+        case _ => null
       }
     }
-
-    val state = new AtomicReference[StateEvent](Disconnected)
-    val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly) withWatcher {
-      (event, session) => state set event
-    }
-    val zk = try Zookeeper(config) catch {
-      case e: IOException => error(s"I/O error: ${e.getMessage}")
-    }
-
-    val commands = Map(
-          "config" -> ConfigCommand(config, state),
-          "cd" -> CdCommand(zk),
-          "pwd" -> PwdCommand(zk),
-          "ls" -> ListCommand(zk),
-          "dir" -> ListCommand(zk),
-          "stat" -> StatCommand(zk),
-          "info" -> StatCommand(zk),
-          "get" -> GetCommand(zk),
-          "set" -> SetCommand(zk),
-          "getacl" -> GetACLCommand(zk),
-          "setacl" -> SetACLCommand(zk),
-          "mk" -> CreateCommand(zk),
-          "create" -> CreateCommand(zk),
-          "rm" -> DeleteCommand(zk),
-          "del" -> DeleteCommand(zk),
-          "quit" -> QuitCommand(zk),
-          "exit" -> QuitCommand(zk),
-          "help" -> HelpCommand(),
-          "?" -> HelpCommand()) withDefaultValue new Command {
-      def apply(cmd: String, args: Seq[String], context: Path): Path = {
-        println(s"$cmd: no such command")
-        context
-      }
-    }
-
-    def execute(args: Seq[String], context: Path): Path = {
-      if (args.size > 0)
-        commands(args.head)(args.head, args.tail, context)
-      else
-        context
-    }
-
-    cmds match {
-      case null =>
-        val reader = Reader(commands.keySet, zk)
-
-        @tailrec def process(context: Path) {
-          if (context != null) {
-            val args = reader(context)
-            process(try execute(args, context) catch {
-              case e: OptException =>
-                println(e.getMessage)
-                context
-              case e: CLIException =>
-                println(e.getMessage)
-                context
-              case _: ConnectionLossException =>
-                println("connection lost")
-                context
-              case _: SessionExpiredException =>
-                println("session has expired; `exit` and restart CLI")
-                context
-              case _: NoAuthException =>
-                println("not authorized")
-                context
-              case e: KeeperException =>
-                println(s"internal zookeeper error: ${e.getMessage}")
-                context
-            })
-          }
-        }
-        process(Path("/"))
-        0
-      case cmds =>
-        (Path("/") /: cmds) { case (context, cmd) =>
-          val args = Splitter split cmd
-          try execute(args, context) catch {
-            case e: OptException =>
-              println(e.getMessage)
-              return 1
-            case e: CLIException =>
-              println(e.getMessage)
-              return 1
-            case _: ConnectionLossException =>
-              println("connection lost")
-              return 1
-            case _: SessionExpiredException =>
-              println("session has expired")
-              return 1
-            case _: NoAuthException =>
-              println("not authorized")
-              return 1
-            case e: KeeperException =>
-              println(s"internal zookeeper error: ${e.getMessage}")
-              return 1
-          }
-        }
-        0
-    }
+    Option(cmds)
   }
 
-  private def error(message: String): Nothing = throw new CLIException(message)
+  private def log(implicit opts: OptResult): Option[(File, Level)] = {
+    if (opts[Boolean]("nolog"))
+      None
+    else {
+      val file = opts[Option[File]]("log") getOrElse new File(System getProperty "user.home", "zk.log")
+      val level = opts[Option[Level]]("level") getOrElse Level.WARN
+      Some(file, level)
+    }
+  }
+}
+
+private[cli] class CLIException(message: String, cause: Throwable) extends Exception(message, cause) {
+  def this(message: String) = this(message, null)
+}
+
+private[cli] object CLIException {
+  def apply(message: String): Nothing = throw new CLIException(message)
 }
