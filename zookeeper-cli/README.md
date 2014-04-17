@@ -60,31 +60,68 @@ Both `.` and `..` can be used in path expressions.
 Show `zk` usage information.
 ```
 $ zk
+$ zk -?
+$ zk --help
 ```
-
+### Connecting to a cluster
 Connect to a ZooKeeper cluster by specifying at least one of its servers.
 ```
-$ zk localhost:2181
-```
-
-Specify a root path, akin to `chroot`.
-```
-$ zk -p /foo localhost:2181
-```
-
-Allow connection to a ZooKeeper server even if a quorum has not been established.
-```
-$ zk -r localhost:2181
-```
-
-Execute a command without entering the `zk` shell.
-```
-$ zk -c "get foo/bar" localhost:2181
+$ zk server1.com:2181
 ```
 
 The port number may be omitted if ZooKeeper servers are listening on port `2181`.
 ```
-$ zk foo.com bar.com
+$ zk server1.com server2.com
+```
+
+Specify a root path, akin to `chroot`.
+```
+$ zk -p /foo server1.com
+```
+
+Allow connection to a ZooKeeper server even if a quorum has not been established.
+```
+$ zk -r server1.com
+```
+
+### Scripting commands
+Execute a command without entering the `zk` shell.
+```
+$ zk -c "get foo/bar" server1.com
+```
+
+Execute commands from an external file whose character encoding is presumed to be `UTF-8`.
+```
+$ zk -f my.commands server1.com
+```
+
+Specify the character encoding that applies to an external command file.
+```
+$ zk -f my.commands -e iso-8859-1 server1.com
+```
+
+Execute multiple commands without entering the `zk` shell.
+```
+$ zk -f /dev/tty server1.com
+ls -l /hbase
+ls -r /hadoop
+^D
+```
+
+### Logging
+Send ZooKeeper log messages to a file other than the default of `$HOME/zk.log`.
+```
+$ zk --log /tmp/zk.log server1.com
+```
+
+Captures all ZooKeeper log messages rather than the default severity level of `warn`.
+```
+$ zk --level all server1.com
+```
+
+Disable ZooKeeper log messages.
+```
+$ zk --nolog server1.com
 ```
 
 ## Using `zk`
@@ -232,7 +269,7 @@ zk> rm -r -f instances
 ```
 
 ### Other useful commands
-Show configuration of `zk` connection to a ZooKeeper cluster, including the session state.
+Show configuration of `zk` connection to a ZooKeeper cluster, including the session state and location of the log file.
 ```
 zk> config
 ```
