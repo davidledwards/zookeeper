@@ -27,6 +27,19 @@ object DeleteCommand {
   otherwise the operation will fail. Alternatively, --force can be used to
   ensure deletion of the node without specifying a version.
 
+  If --recursive is specified, then --force is automatically implied and,
+  consequently, --version is ignored. In this scenario, the candidate set of
+  nodes marked for deletion is constructed by performing a traversal of child
+  nodes beginning at PATH. Then, an attempt is made to delete those nodes in a
+  bottom-up manner. Since this operation is not atomically performed, there
+  exists the possibility of concurrent modifications to the subtree of PATH
+  from another process, thus resulting in spurious failures, most notably the
+  case where nodes are created after expansion of the subtree.
+
+  Use --recursive with caution since this option can be quite destructive.
+  This command does not allow recursive deletion when the effective PATH
+  is `/`.
+
 options:
   --recursive, -r            : recursively deletes nodes under PATH
                                (implies --force on child nodes)
@@ -55,12 +68,26 @@ options:
       }
       val path = if (opts.args.isEmpty) error("path must be specified") else opts.args.head
       val node = Node(context resolve path)
-      try {
-        node.delete(version)
-      } catch {
-        case _: NoNodeException => error(s"${node.path}: no such node")
-        case _: BadVersionException => error(s"${version.get}: version does not match")
-        case _: NotEmptyException => error(s"${node.path}: node has children")
+      val deletions = if (recurse) {
+        if (node.path.path == "/") error("/: recursive deletion of root path not allowed")
+        def traverse(node: Node, deletions: Seq[Node]): Seq[Node] = {
+          try {
+            ((node +: deletions) /: node.children()) { case (d, child) => traverse(child, d) }
+          } catch {
+            case _: NoNodeException => deletions
+          }
+        }
+        traverse(node, Seq()) map { (_, None:Option[Int]) }
+      } else
+        Seq((node, version))
+      deletions foreach { case (node, version) =>
+        try {
+          node.delete(version)
+        } catch {
+          case _: NoNodeException => error(s"${node.path}: no such node")
+          case _: BadVersionException => error(s"${version.get}: version does not match")
+          case _: NotEmptyException => error(s"${node.path}: node has children")
+        }
       }
       context
     }
