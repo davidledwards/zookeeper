@@ -2,7 +2,7 @@ name := "zookeeper-cli"
 
 organization := "com.loopfor.zookeeper"
 
-version := "1.2.1-SNAPSHOT"
+version := "1.2.1"
 
 description := "ZooKeeper CLI"
 
@@ -35,7 +35,7 @@ javacOptions ++= Seq(
 
 // Compile dependencies.
 libraryDependencies ++= Seq(
-  "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2.1-SNAPSHOT",
+  "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2.1",
   "com.loopfor.scalop" %% "scalop" % "1.1",
   "jline" % "jline" % "2.11",
   "log4j" % "log4j" % "1.2.16" % "runtime"

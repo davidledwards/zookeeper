@@ -21,7 +21,7 @@ sbt doc
 
 #### sbt
 ```
-libraryDependencies += "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2"
+libraryDependencies += "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2.1"
 ```
 
 #### Maven
@@ -29,7 +29,7 @@ libraryDependencies += "com.loopfor.zookeeper" %% "zookeeper-client" % "1.2"
 <dependency>
    <groupId>com.loopfor.zookeeper</groupId>
    <artifactId>zookeeper-client_2.10</artifactId>
-   <version>1.2</version>
+   <version>1.2.1</version>
 </dependency>
 ```
 
