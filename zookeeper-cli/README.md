@@ -242,19 +242,19 @@ Forcefully clear the data of node `this/that` without specifying the version.
 zk> set -f this/that
 ```
 
-Replace ACL of node `foo/bar` with `world:*` (all permissions) and version `17`.
+Replace ACL of node `foo/bar` with `world:anyone=*` (all permissions) and version `17`.
 ```
-zk> setacl -v 17 foo/bar world:*
-```
-
-Add ACL `world:rw` (read/write) to node `foo/bar`, ignoring version.
-```
-zk> setacl -a -f foo/bar world:rw
+zk> setacl -v 17 foo/bar world:anyone=*
 ```
 
-Remove ACL `world:rwcd` (read/write/create/delete) to node `foo/bar` with version `23`.
+Add ACL `world:anyone=rw` (read/write) to node `foo/bar`, ignoring version.
 ```
-zk> setacl -r -v 23 foo/bar world:rwcd
+zk> setacl -a -f foo/bar world:anyone=rw
+```
+
+Remove ACL `world:anyone=rwcd` (read/write/create/delete) from node `foo/bar` with version `23`.
+```
+zk> setacl -r -v 23 foo/bar world:anyone=rwcd
 ```
 
 ### Deleting nodes

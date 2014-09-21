@@ -23,8 +23,6 @@ object GetACLCommand {
 
   Gets the ACL for the node specified by each PATH. PATH may be omitted, in
   which case the current working path is assumed.
-
-options:
 """
 
   def apply(zk: Zookeeper) = new Command {

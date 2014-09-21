@@ -21,6 +21,7 @@ import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuilder
+import scala.util.{Failure, Success}
 
 object CreateCommand {
   val Usage = """usage: mk|create [OPTIONS] PATH [DATA]
@@ -42,10 +43,8 @@ object CreateCommand {
   node in PATH must not be ephemeral.
 
   One or more optional ACL entries may be specified with --acl, which must
-  conform to the following syntax: <scheme>:<id>=[rwcda*], where both <scheme>
-  and <id> are optional and any of [rwcda*] characters may be given as
-  permissions. The permission values are (r)ead, (w)rite, (c)reate, (d)elete,
-  (a)dmin and all(*).
+  conform to the following syntax: <scheme>:<id>=[rwcda*]. See *setacl* command
+  for further explanation of the ACL syntax.
 
 options:
   --recursive, -r            : recursively create intermediate nodes
@@ -67,8 +66,8 @@ options:
       ("ephemeral", 'E') ~> enable ~~ false ++
       ("acl", 'A') ~> as { (arg, opts) =>
         val acl = ACL parse arg match {
-          case Some(a) => a
-          case _ => yell(s"$arg: invalid ACL syntax")
+          case Success(a) => a
+          case Failure(e) => yell(e.getMessage)
         }
         opts("acl").asInstanceOf[Seq[ACL]] :+ acl
       } ~~ Seq()

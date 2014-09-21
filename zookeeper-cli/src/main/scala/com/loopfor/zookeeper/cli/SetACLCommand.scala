@@ -17,6 +17,7 @@ package com.loopfor.zookeeper.cli
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
+import scala.util.{Failure, Success}
 
 object SetACLCommand {
   val Usage = """usage: setacl [OPTIONS] PATH ACL[...]
@@ -24,9 +25,10 @@ object SetACLCommand {
   Sets the ACL for the node specified by PATH.
 
   At least one ACL entry must be provided, which must conform to the following
-  syntax: <scheme>:<id>=[rwcda*], where both <scheme> and <id> are optional and
-  any of [rwcda*] characters may be given as permissions. The permission values
-  are (r)ead, (w)rite, (c)reate, (d)elete, (a)dmin and all(*).
+  syntax: <scheme>:<id>=[rwcda*], where zero or more of [rwcda*] characters may
+  be given as permissions. The permission values are (r)ead, (w)rite, (c)reate,
+  (d)elete, (a)dmin and all(*). The :<id> fragment is omitted if the scheme is
+  `auth` (see below).
 
   Unless otherwise specified, --set is assumed, which means that the given ACL
   replaces the current ACL associated with the node at PATH. Both --add
@@ -34,6 +36,31 @@ object SetACLCommand {
   respective operation. Therefore, the entire operation is not atomic, though
   specifying --version ensures that no intervening operations have changed the
   state.
+
+  Valid scheme/id combinations:
+    `world:anyone`
+      Represents anyone. This is the only acceptable form of this scheme.
+
+    `auth`
+      Represents any authenticated user, hence elimination of :<id> fragment.
+      The is the only acceptable form of this scheme.
+
+    `digest:<username>:<password>`
+      Represents users backed by a directory in ZooKeeper.
+        ex: digest:alice:secret
+
+    `host:<domain>`
+      Represents a specific host or hosts within a given domain.
+        ex: host:server1.foo.com
+            host:foo.com
+
+    `ip:<address>[/<prefix>]`
+      Represents an IPv4 or IPv6 address in dotted decimal notation. An
+      optional network prefix specifies the number of leading bits to consider
+      when matching. <prefix> may be in the range [0,32] for IPv4 and [0,128]
+      for IPv6. If not specified, <prefix> is assumed to be the maximum bits.
+        ex: ip:1.2.3.4
+            ip:1.2.3.4/24
 
 options:
   --add, -a                  : adds ACL to existing list
@@ -73,8 +100,8 @@ options:
         case Seq() => error("ACL must be specified")
         case acls => acls map { acl =>
           ACL parse acl match {
-            case Some(a) => a
-            case _ => error(s"$acl: invalid ACL syntax")
+            case Success(a) => a
+            case Failure(e) => error(e.getMessage)
           }
         }
       }

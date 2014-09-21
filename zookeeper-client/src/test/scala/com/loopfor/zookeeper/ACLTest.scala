@@ -17,123 +17,79 @@ package com.loopfor.zookeeper
 
 import com.loopfor.zookeeper.ACL._
 import org.scalatest.FunSuite
-import scala.language._
 
 class ACLTest extends FunSuite {
-  test("Id pattern matching") {
-    Id("foo", "bar") match {
-      case Id("foo", "bar") =>
-    }
-  }
-
-  test("Id parsing") {
+  test("construction of valid ACL instances") {
     val tests = Seq(
-          ("foo:bar", "foo", "bar"),
-          ("foo:", "foo", ""),
-          (":bar", "", "bar"),
-          (":", "", ""))
+      ("world:anyone=", WorldId, 0),
+      ("world:anyone=r", WorldId, Read),
+      ("world:anyone=rw", WorldId, Read | Write),
+      ("world:anyone=rwc", WorldId, Read | Write | Create),
+      ("world:anyone=rwcd", WorldId, Read | Write | Create | Delete),
+      ("world:anyone=rwcda", WorldId, Read | Write | Create | Delete | Admin),
+      ("world:anyone=*", WorldId, All),
+      ("auth=*", AuthId, All),
+      ("auth:=*", AuthId, All),
+      ("digest:username:password=*", DigestId("username", "password"), All),
+      ("digest:username:=*", DigestId("username", ""), All),
+      ("digest::password=*", DigestId("", "password"), All),
+      ("digest::=*", DigestId("", ""), All),
+      ("host:foo.com=*", HostId("foo.com"), All),
+      ("ip:1.2.3.4=*", IpId("1.2.3.4", 32), All),
+      ("ip:1.2.3.4/0=*", IpId("1.2.3.4", 0), All),
+      ("ip:1.2.3.4/32=*", IpId("1.2.3.4", 32), All),
+      ("ip:1:2:3:4:5:6:7:8=*", IpId("1:2:3:4:5:6:7:8", 128), All),
+      ("ip:1:2:3:4:5:6:7:8/0=*", IpId("1:2:3:4:5:6:7:8", 0), All),
+      ("ip:1:2:3:4:5:6:7:8/128=*", IpId("1:2:3:4:5:6:7:8", 128), All)
+    )
 
-    tests foreach { case (s, scheme, id) =>
-      Id parse s match {
-        case Some(i) =>
-          assert(i.scheme === scheme)
-          assert(i.id === id)
-        case _ => fail(s)
-      }
+    tests foreach { case (s, id, permission) =>
+      val acl = ACL(s)
+      assert(acl.id === id)
+      assert(acl.permission === permission)
+      assert(acl.getId === id.zid)
+      assert(acl.getPerms === permission)
     }
   }
 
-  test("Id parsing with invalid strings") {
-    Id parse "foo" match {
-      case Some(_) => fail()
-      case _ =>
-    }
-  }
+  test("construction of invalid ACL instances") {
+    val tests = Seq(
+      "world:anyone",
+      "world:anyone=x",
+      "world=rw"
+    )
 
-  test("equivalence of Id with underlying ZooKeeper Id") {
-    val id = Id("foo", "bar")
-    val zid = Id.toId(id)
-    assert(id.scheme === zid.getScheme())
-    assert(id.id === zid.getId())
+    tests foreach { s =>
+      intercept[IllegalArgumentException] { ACL(s) }
+    }
   }
 
   test("ACL pattern matching") {
-    ACL("foo", "bar", Read) match {
-      case ACL(Id("foo", "bar"), Read) =>
+    ACL("world:anyone=r") match {
+      case ACL(WorldId, Read) =>
+      case _ => fail()
     }
-    ACL(Id("foo", "bar"), All) match {
-      case ACL(Id("foo", "bar"), All) =>
+    ACL("auth=r") match {
+      case ACL(AuthId, Read) =>
+      case _ => fail()
     }
-  }
-
-  test("ACL parsing") {
-    val tests = Seq(
-          ("foo:bar=", 0),
-          ("foo:bar=r", Read),
-          ("foo:bar=rw", Read | Write),
-          ("foo:bar=rwc", Read | Write | Create),
-          ("foo:bar=rwcd", Read | Write | Create | Delete),
-          ("foo:bar=rwcda", Read | Write | Create | Delete | Admin),
-          ("foo:bar=*", Read | Write | Create | Delete | Admin))
-
-    tests foreach { case (s, permission) =>
-      ACL parse s match {
-        case Some(acl) => assert(acl.permission === permission)
-        case _ => fail(s)
-      }
+    ACL("digest:username:password=r") match {
+      case ACL(DigestId("username", "password"), Read) =>
+      case _ => fail()
     }
-  }
-
-  test("ACL parsing with invalid strings") {
-    val tests = Seq(
-          "foo:bar",
-          "foo:bar=x",
-          "foo:bar=rwcdax")
-
-    tests foreach { s =>
-      ACL parse s match {
-        case Some(_) => fail(s)
-        case _ =>
-      }
+    ACL("host:foo.com=r") match {
+      case ACL(HostId("foo.com"), Read) =>
+      case _ => fail()
     }
-  }
-
-  test("equivalence of ACL with underlying ZooKeeper ACL") {
-    val acl = ACL("foo", "bar", Read | Write)
-    val zacl = ACL.toZACL(acl)
-    assert(acl.id.scheme === zacl.getId.getScheme)
-    assert(acl.id.id === zacl.getId.getId)
-    assert(acl.permission === zacl.getPerms)
+    ACL("ip:1.2.3.4/24=r") match {
+      case ACL(IpId("1.2.3.4", 24), Read) =>
+      case _ => fail()
+    }
   }
 
   test("ACL construction from Id") {
-    val perm = Read | Write
-    val acl = Id("foo", "bar") permit perm
-    acl match {
-      case ACL(Id("foo", "bar"), perm) =>
-    }
-  }
-
-  test("implicit construction of Id") {
-    val perm = Create | Delete
-    val id: Id = ("foo", "bar")
-    id match {
-      case Id("foo", "bar") =>
-    }
-    val acl = ("foo", "bar") permit perm
-    acl match {
-      case ACL(Id("foo", "bar"), perm) =>
-    }
-  }
-
-  test("equality and hash") {
-    val a = Id("foo", "bar")
-    val b = Id("foo", "bar")
-    assert(a === b)
-    assert(a.hashCode === b.hashCode)
-
-    val c = Id("foo", "baz")
-    assert(a != c)
-    assert(a.hashCode != c.hashCode)
+    val acl = Id("world", "anyone").permit(Read | Write)
+    assert(acl.id === Id("world", "anyone"))
+    assert(acl.permission === (Read | Write))
   }
 }

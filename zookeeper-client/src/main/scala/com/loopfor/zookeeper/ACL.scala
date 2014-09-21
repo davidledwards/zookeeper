@@ -16,139 +16,18 @@
 package com.loopfor.zookeeper
 
 import org.apache.zookeeper.ZooDefs.{Ids, Perms}
-import org.apache.zookeeper.data.{ACL => ZACL, Id => ZId}
+import org.apache.zookeeper.data.{ACL => ZACL}
 import scala.collection.JavaConverters._
 import scala.language._
-
-/**
- * An ''identity'' associated with an [[ACL]].
- */
-sealed trait Id {
-  /**
-   * Returns the scheme.
-   * 
-   * @return a string representing the scheme
-   */
-  def scheme: String
-
-  /**
-   * Returns the id.
-   * 
-   * @return a string representing the id
-   */
-  def id: String
-
-  /**
-   * Returns an ACL for this identity using the given permission.
-   * 
-   * @param permission the bitwise union of permission that apply to the ACL
-   * @return an ACL with the given `permission`
-   */
-  def permit(permission: Int): ACL
-}
+import scala.util.{Failure, Success, Try}
 
 /**
  * An ''access control list'' assignable to a ZooKeeper node.
+ *
+ * @param id the identity to which permissions apply
+ * @param permission the bitwise union of permissions that apply to this ACL
  */
-sealed trait ACL {
-  /**
-   * Returns the identity associated with the ACL
-   * 
-   * @return the identity to which permissions apply
-   */
-  def id: Id
-
-  /**
-   * Returns the permissions that apply to this ACL.
-   * 
-   * @see [[ACL$#Read Read]], [[ACL$#Write Write]], [[ACL$#Create Create]], [[ACL$#Delete Delete]], [[ACL$#Admin Admin]],
-   * [[ACL$#All All]]
-   * 
-   * @return the bitwise union of permissions that apply to this ACL
-   */
-  def permission: Int
-}
-
-/**
- * Constructs and deconstructs [[Id]] values.
- */
-object Id {
-  /**
-   * An identity whose scheme is "`world`" and id is "`anyone`".
-   */
-  val Anyone: Id = Id(Ids.ANYONE_ID_UNSAFE)
-
-  /**
-   * An identity whose scheme is "`auth`" and id is "".
-   * 
-   * This is a special identity, usable only while setting ACLs, that is substituted with the identities used during client
-   * authentication.
-   */
-  val Creator: Id = Id(Ids.AUTH_IDS)
-
-  /**
-   * Constructs a new identity.
-   * 
-   * @param scheme a string representing the scheme
-   * @param id a string representing the id
-   * @return an identity with the given `scheme` and `id`
-   */
-  def apply(scheme: String, id: String): Id = new Impl(scheme, id)
-
-  /**
-   * Constructs a new identity from the input string `s`.
-   * 
-   * @param s a string representing the identity
-   * @return the identity in `s` if it conforms to the specified syntax
-   * 
-   * @throws IllegalArgumentException if `s` cannot be parsed
-   * 
-   * @see [[parse]]
-   */
-  def apply(s: String): Id = parse(s) match {
-    case Some(id) => id
-    case _ => throw new IllegalArgumentException(s + ": invalid syntax")
-  }
-
-  private[zookeeper] def apply(zid: ZId): Id = new Impl(zid.getScheme, zid.getId)
-
-  /**
-   * Used in pattern matching to deconstruct an identity.
-   * 
-   * @param id selector value
-   * @return a `Some` containing `scheme` and `id` if the selector value is not `null`, otherwise `None`
-   */
-  def unapply(id: Id): Option[(String, String)] =
-    if (id == null) None else Some(id.scheme, id.id)
-
-  /**
-   * Parses the identity in the input string `s`.
-   * 
-   * The syntax of `s` is ''scheme''`:`''id'', where `id` and `scheme` may be empty.
-   * 
-   * @param s a string representing the identity
-   * @return a `Some` containing the identity in `s` if it conforms to the specified syntax, otherwise `None`
-   */
-  def parse(s: String): Option[Id] = (s indexOf ':') match {
-    case -1 => None
-    case n => Some(Id(s take n, s drop n + 1))
-  }
-
-  private[zookeeper] def toId(id: Id): ZId = id.asInstanceOf[ZId]
-
-  private class Impl(val scheme: String, val id: String) extends ZId(scheme, id) with Id {
-    def permit(permission: Int): ACL = ACL(this, permission)
-
-    override def equals(that: Any): Boolean = that match {
-      case _that: Id => _that.scheme == scheme && _that.id == id
-      case _ => false
-    }
-
-    override def hashCode: Int = scheme.hashCode * 37 + id.hashCode
-
-    override def toString: String = scheme + ":" + id
-  }
-}
+case class ACL(id: Id, permission: Int) extends ZACL(permission, id.zid)
 
 /**
  * Constructs and deconstructs [[ACL]] values.
@@ -159,6 +38,8 @@ object Id {
  * 
  * Several commonly used ACL values have been predefined for sake of convenience: [[AnyoneAll]], [[AnyoneRead]],
  * [[CreatorAll]].
+ *
+ * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_ZooKeeperAccessControl ACLs]]
  */
 object ACL {
   /**
@@ -212,67 +93,48 @@ object ACL {
   val CreatorAll: Seq[ACL] = ACL(Ids.CREATOR_ALL_ACL)
 
   /**
-   * Constructs a new ACL using the given identity and permission.
-   * 
-   * @param id the identity to which permissions apply
-   * @param permission the bitwise union of permissions that apply to the ACL
-   * @return an ACL with the given `id` and `permission`
-   */
-  def apply(id: Id, permission: Int): ACL = new Impl(id, permission)
-
-  /**
-   * Constructs a new ACL using the given identity and permission.
-   * 
-   * @param scheme a string representing the scheme
-   * @param id a string representing the id
-   * @param permission the bitwise union of permissions that apply to the ACL
-   * @return an ACL with the given `scheme`, `id` and `permission`, where `scheme` and `id` collectively represent the identity
-   */
-  def apply(scheme: String, id: String, permission: Int): ACL = new Impl(Id(scheme, id), permission)
-
-  /**
    * Constructs a new ACL from the input string `s`.
    * 
    * @param s a string representing the ACL
    * @return the ACL in `s` if it conforms to the specific syntax
    * 
+   * @throws IllegalArgumentException if `s` does not conform to the proper syntax
+   *
    * @see [[parse]]
    */
   def apply(s: String): ACL = parse(s) match {
-    case Some(acl) => acl
-    case _ => throw new IllegalArgumentException(s + ": invalid syntax")
+    case Success(acl) => acl
+    case Failure(e) => throw e
   }
-
-  /**
-   * Used in pattern matching to deconstruct an ACL
-   * 
-   * @param acl selector value
-   * @return a `Some` containing `id` and `permission` if the selector value is not `null`, otherwise `None`
-   */
-  def unapply(acl: ACL): Option[(Id, Int)] =
-    if (acl == null) None else Some(acl.id, acl.permission)
 
   /**
    * Parses the ACL in the input string `s`.
    * 
-   * The syntax of `s` is ''scheme''`:`''id''`=`[`rwcda*`], where `scheme` and `id` may be empty and any of `rwcda*` may be
-   * repeated zero or more times.
-   * 
+   * The syntax of `s` is `"''scheme'':''id''=[rwcda*]"`, where the following apply:
+   *  - the `:` delimiter may be omitted if ''id'' is not required
+   *  - `rwcda*` may be repeated zero or more times
+   *
    * @param s a string representing the ACL
-   * @return a `Some` containing the ACL in `s` if it conforms to the specified syntax, otherwise `None`
+   * @return a `Success` containing the ACL in `s` if it conforms to the proper syntax, otherwise a `Failure`
+   * containing the offending exception
    */
-  def parse(s: String): Option[ACL] = (s indexOf '=') match {
-    case -1 => None
-    case n => Id parse (s take n) match {
-      case Some(id) => (s drop n + 1) match {
-        case Permission(p) => Some(ACL(id, p))
-        case _ => None
-      }
-      case _ => None
+  def parse(s: String): Try[ACL] = Try {
+    def error(message: String): Nothing = throw new IllegalArgumentException(s"${s}: ${message}")
+    s.split("=", 2) match {
+      case Array(id, permission) =>
+        (Id parse id) match {
+          case Success(i) =>
+            permission match {
+              case Permission(p) => ACL(i, p)
+              case _ => error("invalid permissions")
+            }
+          case Failure(e) => throw e
+        }
+      case _ => error("expecting permissions")
     }
   }
 
-  private[zookeeper] def apply(zacl: ZACL): ACL = new Impl(Id(zacl.getId), zacl.getPerms)
+  private[zookeeper] def apply(zacl: ZACL): ACL = ACL(Id(zacl.getId), zacl.getPerms)
 
   private[zookeeper] def apply(zacl: java.util.List[ZACL]): Seq[ACL] =
     (Seq[ACL]() /: zacl.asScala) { case (acl, zacl) => acl :+ ACL(zacl)}
@@ -281,19 +143,6 @@ object ACL {
     (Seq[ZACL]() /: acl) { case (zacl, acl) => zacl :+ toZACL(acl) } asJava
 
   private[zookeeper] def toZACL(acl: ACL): ZACL = acl.asInstanceOf[ZACL]
-
-  implicit def tupleToIdentity(id: (String, String)): Id = Id(id._1, id._2)
-
-  private class Impl(val id: Id, val permission: Int) extends ZACL(permission, Id.toId(id)) with ACL {
-    override def equals(that: Any): Boolean = that match {
-      case _that: ACL => _that.id == id && _that.permission == permission
-      case _ => false
-    }
-
-    override def hashCode: Int = id.hashCode * 37 + permission
-
-    override def toString: String = id + "=" + Permission(permission)
-  }
 
   private object Permission {
     def apply(perms: Int): String = {
