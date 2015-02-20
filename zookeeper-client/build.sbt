@@ -2,7 +2,7 @@ name := "zookeeper-client"
 
 organization := "com.loopfor.zookeeper"
 
-version := "1.2.1"
+version := "1.3"
 
 description := "Scala API for ZooKeeper"
 
@@ -16,7 +16,7 @@ scmInfo := Some(ScmInfo(
   Some("scm:git:https://github.com/davidledwards/zookeeper.git")
 ))
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.5"
 
 scalacOptions ++= Seq(
   "-deprecation",
@@ -26,8 +26,8 @@ scalacOptions ++= Seq(
 )
 
 javacOptions ++= Seq(
-  "-source", "1.7",
-  "-target", "1.7"
+  "-source", "1.6",
+  "-target", "1.6"
 )
 
 // Compile dependencies.
@@ -40,7 +40,7 @@ libraryDependencies ++= Seq(
 
 // Test dependencies.
 libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "2.1.3" % "test"
+  "org.scalatest" %% "scalatest" % "2.2.4" % "test"
 )
 
 publishMavenStyle := true

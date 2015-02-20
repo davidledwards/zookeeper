@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli._
 import scala.util.{Failure, Success}
 
-object SetACLCommand {
+object SetACL {
   val Usage = """usage: setacl [OPTIONS] PATH ACL[...]
 
   Sets the ACL for the node specified by PATH.
@@ -70,10 +71,10 @@ options:
   --force, -f                : forcefully set ACL regardless of version
 """
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
 
-    private lazy val parser =
+    lazy val parser =
       ("add", 'a') ~> enable ~~ false ++
       ("remove", 'r') ~> enable ~~ false ++
       ("set", 's') ~> enable ~~ false ++
@@ -81,49 +82,83 @@ options:
       ("version", 'v') ~> asSomeInt ~~ None
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val action =
-        if (opts[Boolean]("set")) 'set
-        else if (opts[Boolean]("add")) 'add
-        else if (opts[Boolean]("remove")) 'remove
-        else 'set
-      val version = {
-        val force = opts[Boolean]("force")
-        if (force) None
-        else opts[Option[Int]]("version") match {
-          case None => error("version must be specified; otherwise use --force")
-          case v => v
-        }
-      }
-      val path = if (opts.args.isEmpty) error("path must be specified") else opts.args.head
-      val acl = opts.args.tail match {
-        case Seq() => error("ACL must be specified")
-        case acls => acls map { acl =>
-          ACL parse acl match {
-            case Success(a) => a
-            case Failure(e) => error(e.getMessage)
-          }
-        }
-      }
+      implicit val opts = parser parse args
+      val action = actionOpt
+      val version = versionOpt
+      val (path, afterPath) = pathArg
+      val acl = aclArgs(afterPath)
       val node = Node(context resolve path)
-      val (curACL, _) = try node.getACL() catch {
-        case _: NoNodeException => error(s"${node.path}: no such node")
-      }
-      val newACL = action match {
-        case 'add => (toMap(curACL) /: acl) { case (c, a) => c + (a.id -> a) }.values.toSeq
-        case 'remove => (toMap(curACL) /: acl) { case (c, a) => c - a.id }.values.toSeq
-        case 'set => acl
-      }
-      if (newACL.isEmpty) error("new ACL would be empty")
-      try node.setACL(newACL, version) catch {
-        case _: NoNodeException => error(s"${node.path}: no such node")
-        case _: BadVersionException => error(s"${version.get}: version does not match")
-        case _: InvalidACLException => error(s"${newACL.mkString(",")}: invalid ACL")
-      }
+      setACL(node, version, action, acl)
       context
     }
+  }
 
-    private def toMap(acl: Seq[ACL]): Map[Id, ACL] =
-      (Map[Id, ACL]() /: acl) { case (m, a) => m + (a.id -> a) }
+  def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
+    val parser =
+      ("add", 'a') ~> enable ~~ false ++
+      ("remove", 'r') ~> enable ~~ false ++
+      ("set", 's') ~> enable ~~ false
+    implicit val opts = parser parse args
+    val action = actionOpt
+    val acl = aclArgs(opts.args)
+
+    def apply(node: Node): Unit = {
+      setACL(node, None, action, acl)
+    }
+  }
+
+  private def setACL(node: Node, version: Option[Int], action: Symbol, acl: Seq[ACL]): Unit = {
+    val (curACL, _) = try node.getACL() catch {
+      case _: NoNodeException => complain(s"${node.path}: no such node")
+    }
+    val newACL = action match {
+      case 'add => (toMap(curACL) /: acl) { case (c, a) => c + (a.id -> a) }.values.toSeq
+      case 'remove => (toMap(curACL) /: acl) { case (c, a) => c - a.id }.values.toSeq
+      case 'set => acl
+    }
+    newACL match {
+      case Seq() => complain("new ACL would be empty")
+      case _ =>
+        try node.setACL(newACL, version) catch {
+          case _: NoNodeException => complain(s"${node.path}: no such node")
+          case _: BadVersionException => complain(s"${version.get}: version does not match")
+          case _: InvalidACLException => complain(s"${newACL.mkString(",")}: invalid ACL")
+        }
+    }
+  }
+
+  private def actionOpt(implicit opts: OptResult): Symbol = {
+    if (opts[Boolean]("set")) 'set
+    else if (opts[Boolean]("add")) 'add
+    else if (opts[Boolean]("remove")) 'remove
+    else 'set
+  }
+
+  private def versionOpt(implicit opts: OptResult): Option[Int] = {
+    val force = opts[Boolean]("force")
+    if (force) None
+    else opts[Option[Int]]("version") match {
+      case None => complain("version must be specified; otherwise use --force")
+      case v => v
+    }
+  }
+
+  private def pathArg(implicit opts: OptResult): (Path, Seq[String]) = opts.args match {
+    case Seq(path, rest @ _*) => (Path(path), rest)
+    case Seq() => complain("path must be specified")
+  }
+
+  private def aclArgs(args: Seq[String]): Seq[ACL] = args match {
+    case Seq() => complain("ACL must be specified")
+    case _ => args map { acl =>
+      ACL.parse(acl) match {
+        case Success(a) => a
+        case Failure(e) => complain(e.getMessage)
+      }
+    }
+  }
+
+  private def toMap(acl: Seq[ACL]): Map[Id, ACL] = {
+    (Map.empty[Id, ACL] /: acl) { case (m, a) => m + (a.id -> a) }
   }
 }

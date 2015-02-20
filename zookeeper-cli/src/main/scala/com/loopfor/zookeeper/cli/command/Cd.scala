@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
-import java.util.concurrent.atomic.AtomicReference
 
-object CdCommand {
+object Cd {
   val Usage = """usage: cd [OPTIONS] [PATH|-]
 
   Changes the current working path to PATH if specified. If PATH is omitted,
@@ -31,28 +30,30 @@ options:
                                (does not fail command if nonexistent)
 """
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
-    private val last = new AtomicReference(Path("/"))
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
+    var last = Path("/")
 
-    private lazy val parser = ("check", 'c') ~> enable ~~ false
+    lazy val parser = ("check", 'c') ~> enable ~~ false
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val check = opts[Boolean]("check")
-      val path = opts.args.headOption match {
-        case Some("-") => last.get
-        case Some(p) => context.resolve(p).normalize
-        case None => Path("/")
+      implicit val opts = parser parse args
+      val check = checkOpt
+      val path = context.resolve(pathArg(opts.args, last)).normalize
+      if (check) Node(path).exists() match {
+        case Some(_) => println(path)
+        case _ => println(s"$path: does not exist")
       }
-      if (check) {
-        Node(path).exists() match {
-          case Some(status) => println(path)
-          case _ => println(s"$path: does not exist")
-        }
-      }
-      last.set(context)
+      last = context
       path
     }
+  }
+
+  private def checkOpt(implicit opts: OptResult): Boolean = opts("check")
+
+  private def pathArg(args: Seq[String], last: Path): Path = args.headOption match {
+    case Some("-") => last
+    case Some(path) => Path(path)
+    case None => Path("/")
   }
 }

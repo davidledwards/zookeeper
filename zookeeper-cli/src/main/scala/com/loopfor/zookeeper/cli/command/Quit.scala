@@ -13,32 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
-import com.loopfor.scalop._
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli._
 
-object PwdCommand {
-  val Usage = """usage: pwd [OPTIONS]
+object Quit {
+  val Usage = """usage: exit|quit
 
-  Shows the current working path.
-
-options:
-  --check, -c                : check existence of node at working path
+  Exits the CLI.
 """
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
-
-    private lazy val parser = ("check", 'c') ~> enable ~~ false
-
+  def command(zk: Zookeeper) = new CommandProcessor {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val check = opts[Boolean]("check")
-      print(context)
-      if (check && Node(context).exists().isEmpty) print(": does not exist")
-      println()
-      context
+      zk.close()
+      null
     }
   }
 }

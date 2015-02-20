@@ -1,4 +1,4 @@
-# Scala API/CLI for ZooKeeper
+# Scala API and CLI for ZooKeeper
 A collection of Scala artifacts that make working with ZooKeeper enjoyable.
 
 ## Projects
@@ -8,7 +8,7 @@ A collection of Scala artifacts that make working with ZooKeeper enjoyable.
 See individual subprojects for build instructions. Note that `zookeeper-cli` depends on `zookeeper-client`.
 
 ## License
-Copyright 2013 David Edwards
+Copyright 2015 David Edwards
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

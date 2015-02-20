@@ -16,7 +16,6 @@
 package com.loopfor.zookeeper
 
 import scala.annotation.tailrec
-import scala.collection.immutable.Stack
 import scala.collection.mutable.StringBuilder
 import scala.language._
 
@@ -204,21 +203,21 @@ object Path {
     def resolve(path: Path): Path = resolve(path.path)
 
     lazy val normalize: Path = {
-      @tailrec def reduce(parts: Seq[String], stack: Stack[String]): Stack[String] = {
+      @tailrec def reduce(parts: Seq[String], stack: List[String]): List[String] = {
         parts.headOption match {
           case Some(part) =>
             reduce(parts.tail, part match {
               case ".." => stack.headOption match {
-                case Some(top) => if (top == "") stack else if (top == "..") stack.push(part) else stack.pop
-                case _ => stack.push(part)
+                case Some(top) => if (top == "") stack else if (top == "..") part :: stack else stack.tail
+                case _ => part :: stack
               }
               case "." => stack
-              case _ => stack.push(part)
+              case _ => part :: stack
             })
           case _ => stack
         }
       }
-      val stack = reduce(parse(path), Stack()).reverse
+      val stack = reduce(parse(path), List()).reverse
       Path(stack.headOption match {
         case None => ""
         case Some("") => "/" + (stack.tail mkString "/")

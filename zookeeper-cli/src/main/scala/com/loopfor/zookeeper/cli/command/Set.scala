@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli._
 import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuilder
 
-object SetCommand {
+object Set {
   val Usage = """usage: set [OPTIONS] PATH [DATA]
 
   Sets the DATA for the node specified by PATH.
@@ -44,48 +45,72 @@ options:
 
   private val UTF_8 = Charset forName "UTF-8"
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
 
-    private lazy val parser =
+    lazy val parser =
       ("encoding", 'e') ~> asCharset ~~ UTF_8 ++
       ("version", 'v') ~> asSomeInt ~~ None ++
       ("force", 'f') ~> enable ~~ false
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val version = {
-        val force = opts[Boolean]("force")
-        if (force) None
-        else opts[Option[Int]]("version") match {
-          case None => error("version must be specified; otherwise use --force")
-          case v => v
-        }
-      }
-      val path = if (opts.args.isEmpty) error("path must be specified") else opts.args.head
-      val data = opts.args.tail.headOption match {
-        case Some(d) => d.headOption match {
-          case Some('@') =>
-            val name = d drop 1
-            val file = try new FileInputStream(name) catch {
-              case _: FileNotFoundException => error(s"$name: file not found")
-              case _: SecurityException => error(s"$name: access denied")
-            }
-            try read(file) catch {
-              case e: IOException => error(s"$name: I/O error: ${e.getMessage}")
-            } finally
-              file.close()
-          case _ => d getBytes opts[Charset]("encoding")
-        }
-        case _ => Array[Byte]()
-      }
+      implicit val opts = parser parse args
+      val version = versionOpt
+      val (path, afterPath) = pathArg
+      val data = dataArg(afterPath)
       val node = Node(context resolve path)
-      try node.set(data, version) catch {
-        case _: NoNodeException => error(s"${node.path}: no such node")
-        case _: BadVersionException => error(s"${version.get}: version does not match")
-      }
+      set(node, version, data)
       context
     }
+  }
+
+  def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
+    val parser =
+      ("encoding", 'e') ~> asCharset ~~ UTF_8
+    implicit val opts = parser parse args
+    val data = dataArg(opts.args)
+
+    def apply(node: Node): Unit = {
+      set(node, None, data)
+    }
+  }
+
+  private def set(node: Node, version: Option[Int], data: Array[Byte]): Unit = {
+    try node.set(data, version) catch {
+      case _: NoNodeException => complain(s"${node.path}: no such node")
+      case _: BadVersionException => complain(s"${version.get}: version does not match")
+    }
+  }
+
+  private def versionOpt(implicit opts: OptResult): Option[Int] = {
+    val force = opts[Boolean]("force")
+    if (force) None
+    else opts[Option[Int]]("version") match {
+      case None => complain("version must be specified; otherwise use --force")
+      case v => v
+    }
+  }
+
+  private def pathArg(implicit opts: OptResult): (Path, Seq[String]) = opts.args match {
+    case Seq(path, rest @ _*) => (Path(path), rest)
+    case Seq() => complain("path must be specified")
+  }
+
+  private def dataArg(args: Seq[String])(implicit opts: OptResult): Array[Byte] = args match {
+    case Seq(data, _*) => data.headOption match {
+      case Some('@') =>
+        val name = data drop 1
+        val file = try new FileInputStream(name) catch {
+          case _: FileNotFoundException => complain(s"$name: file not found")
+          case _: SecurityException => complain(s"$name: access denied")
+        }
+        try read(file) catch {
+          case e: IOException => complain(s"$name: I/O error: ${e.getMessage}")
+        } finally
+          file.close()
+      case _ => data getBytes opts[Charset]("encoding")
+    }
+    case Seq() => Array.empty[Byte]
   }
 
   private def read(file: FileInputStream): Array[Byte] = {

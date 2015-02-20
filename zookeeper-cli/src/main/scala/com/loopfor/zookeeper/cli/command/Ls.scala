@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
-import scala.language._
 
-object ListCommand {
-  val Usage= """usage: ls|dir [OPTIONS] [PATH...]
+object Ls {
+  val Usage = """usage: ls|dir [OPTIONS] [PATH...]
 
   List child nodes for each PATH. PATH may be omitted, in which case the
   current working path is assumed.
@@ -34,40 +33,67 @@ options:
   --long, -l                 : display in long format
 """
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
+  private type FormatFunction = (Node, Int) => String
 
-    private lazy val parser =
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
+
+    lazy val parser =
       ("recursive", 'r') ~> enable ~~ false ++
       ("long", 'l') ~> set(formatLong _) ~~ formatShort _
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val recurse = opts[Boolean]("recursive")
-      val format  = opts[(Node, Int) => String]("long")
-      val paths = if (opts.args.size > 0) opts.args else Seq("")
-      val count = paths.size
-      (1 /: paths) { case (i, path) =>
-        val node = Node(context resolve path)
-        try {
-          val children = node.children() sortBy { _.name }
-          if (count > 1) println(s"${node.path}:")
-          if (recurse)
-            traverse(children, 0, format)
-          else
-            children foreach { child => println(format(child, 0)) }
-          if (count > 1 && i < count) println()
-        } catch {
-          case _: NoNodeException => println(s"${node.path}: no such node")
-        }
-        i + 1
-      }
+      implicit val opts = parser parse args
+      val recurse = recursiveOpt
+      val format = formatOpt
+      val nodes = pathArgs map { path => Node(context resolve path) }
+      list(nodes, recurse, format)
       context
     }
   }
 
-  private def formatShort(node: Node, depth: Int): String =
+  def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
+    val parser =
+      ("long", 'l') ~> set(formatLong _) ~~ formatShort _
+
+    implicit val opts = parser parse args
+    val format = formatOpt
+
+    def apply(node: Node): Unit = {
+      list(Seq(node), false, format)
+    }
+  }
+
+  private def list(nodes: Seq[Node], recurse: Boolean, format: FormatFunction): Unit = {
+    val count = nodes.size
+    (1 /: nodes) { case (i, node) =>
+      try {
+        val children = node.children() sortBy { _.name }
+        if (count > 1) println(s"${node.path}:")
+        if (recurse)
+          traverse(children, 0, format)
+        else
+          children foreach { child => println(format(child, 0)) }
+        if (count > 1 && i < count) println()
+      } catch {
+        case _: NoNodeException => println(s"${node.path}: no such node")
+      }
+      i + 1
+    }
+  }
+
+  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
+
+  private def formatOpt(implicit opts: OptResult): FormatFunction = opts("long")
+
+  private def pathArgs(implicit opts: OptResult): Seq[Path] = opts.args match {
+    case Seq() => Seq(Path(""))
+    case paths => paths map { Path(_) }
+  }
+
+  private def formatShort(node: Node, depth: Int): String = {
     indent(depth) + node.name
+  }
 
   private def formatLong(node: Node, depth: Int): String = {
     indent(depth) + node.name + (node.exists() match {
@@ -79,7 +105,7 @@ options:
   }
 
   private def indent(depth: Int) = {
-    def pad(depth: Int) = { Array.fill((depth - 1) * 2)(' ') mkString }
+    def pad(depth: Int) = " " * ((depth - 1) * 2)
     if (depth > 0) pad(depth) + "+ " else ""
   }
 

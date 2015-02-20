@@ -13,10 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper
 
-import com.loopfor.zookeeper._
+package object cli {
+  def complain(message: String): Nothing = throw new CLIException(message)
 
-trait Command extends ((String, Seq[String], Path) => Path) {
-  def error(message: String): Nothing = throw new CLIException(message)
+  class CLIException(message: String, cause: Throwable) extends Exception(message, cause) {
+    def this(message: String) = this(message, null)
+  }
+
+  object CLIException {
+    def apply(message: String): Nothing = throw new CLIException(message)
+  }
 }

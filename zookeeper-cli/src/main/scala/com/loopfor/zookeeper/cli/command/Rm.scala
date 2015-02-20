@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli._
 
-object DeleteCommand {
+object Rm {
   val Usage = """usage: rm|del [OPTIONS] PATH
 
   Deletes the node specified by PATH.
@@ -47,49 +48,76 @@ options:
   --force, -f                : forcefully delete node regardless of version
 """
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
 
-    private lazy val parser =
+    lazy val parser =
       ("recursive", 'r') ~> enable ~~ false ++
       ("force", 'f') ~> enable ~~ false ++
       ("version", 'v') ~> asSomeInt ~~ None
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val recurse = opts[Boolean]("recursive")
-      val version = {
-        val force = opts[Boolean]("force")
-        if (force || recurse) None
-        else opts[Option[Int]]("version") match {
-          case None => error("version must be specified; otherwise use --force")
-          case v => v
-        }
-      }
-      val path = if (opts.args.isEmpty) error("path must be specified") else opts.args.head
+      implicit val opts = parser parse args
+      val recurse = recursiveOpt
+      val version = versionOpt
+      val path = pathArg
       val node = Node(context resolve path)
-      val deletions = if (recurse) {
-        if (node.path.path == "/") error("/: recursive deletion of root path not allowed")
-        def traverse(node: Node, deletions: Seq[Node]): Seq[Node] = {
-          try {
-            ((node +: deletions) /: node.children()) { case (d, child) => traverse(child, d) }
-          } catch {
-            case _: NoNodeException => deletions
-          }
-        }
-        traverse(node, Seq()) map { (_, None:Option[Int]) }
-      } else
-        Seq((node, version))
-      deletions foreach { case (node, version) =>
-        try {
-          node.delete(version)
-        } catch {
-          case _: NoNodeException => error(s"${node.path}: no such node")
-          case _: BadVersionException => error(s"${version.get}: version does not match")
-          case _: NotEmptyException => error(s"${node.path}: node has children")
-        }
-      }
+      delete(node, recurse, version)
       context
     }
   }
+
+  def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
+    implicit val _zk = zk
+    val parser =
+      ("recursive", 'r') ~> enable ~~ false
+    implicit val opts = parser parse args
+    val recurse = recursiveOpt
+
+    def apply(node: Node): Unit = {
+      delete(node, recurse, None)
+    }
+  }
+
+  private def delete(node: Node, recurse: Boolean, version: Option[Int])(implicit zk: Zookeeper): Unit = {
+    val deletions = if (recurse) {
+      if (node.path.path == "/") complain("/: recursive deletion of root path not allowed")
+      def traverse(node: Node, deletions: Seq[Node]): Seq[Node] = {
+        try {
+          ((node +: deletions) /: node.children()) { case (d, child) => traverse(child, d) }
+        } catch {
+          case _: NoNodeException => deletions
+        }
+      }
+      traverse(node, Seq.empty) map { (_, Option.empty[Int]) }
+    } else
+      Seq((node, version))
+    deletions foreach { case (node, version) =>
+      try {
+        node.delete(version)
+      } catch {
+        case _: NoNodeException => complain(s"${node.path}: no such node")
+        case _: BadVersionException => complain(s"${version.get}: version does not match")
+        case _: NotEmptyException => complain(s"${node.path}: node has children")
+      }
+    }
+  }
+
+  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
+
+  private def versionOpt(implicit opts: OptResult): Option[Int] = {
+    val force = opts[Boolean]("force")
+    val recurse = opts[Boolean]("recursive")
+    if (force || recurse) None
+    else opts[Option[Int]]("version") match {
+      case None => complain("version must be specified; otherwise use --force")
+      case v => v
+    }
+  }
+
+  private def pathArg(implicit opts: OptResult): Path = opts.args match {
+    case Seq(path, _*) => Path(path)
+    case Seq() => complain("path must be specified")
+  }
 }
+

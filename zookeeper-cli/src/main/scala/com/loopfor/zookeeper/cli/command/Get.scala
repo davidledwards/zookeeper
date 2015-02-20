@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.scalop._
 import com.loopfor.zookeeper._
 import java.nio.charset.Charset
 import scala.annotation.tailrec
-import scala.language._
 
-object GetCommand {
+object Get {
   val Usage = """usage: get [OPTIONS] [PATH...]
 
   Gets the data for the node specified by each PATH. PATH may be omitted, in
@@ -42,47 +41,67 @@ options:
 
   private val UTF_8 = Charset forName "UTF-8"
 
-  private type DisplayFunction = (Array[Byte], OptResult) => Unit
+  private type DisplayFunction = Array[Byte] => Unit
 
-  def apply(zk: Zookeeper) = new Command {
-    private implicit val _zk = zk
+  private lazy val parser =
+    ("hex", 'h') ~> enable ~~ false ++
+    ("string", 's') ~> enable ~~ false ++
+    ("binary", 'b') ~> enable ~~ false ++
+    ("encoding", 'e') ~> asCharset ~~ UTF_8
 
-    private lazy val parser =
-      ("hex", 'h') ~> enable ~~ false ++
-      ("string", 's') ~> enable ~~ false ++
-      ("binary", 'b') ~> enable ~~ false ++
-      ("encoding", 'e') ~> asCharset ~~ UTF_8
+  def command(zk: Zookeeper) = new CommandProcessor {
+    implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val display =
-        if (opts[Boolean]("hex")) displayHex _
-        else if (opts[Boolean]("binary")) displayBinary _
-        else if (opts[Boolean]("string")) displayString _
-        else displayHex _
-      val paths = if (opts.args.size > 0) opts.args else Seq("")
-      val count = paths.size
-      (1 /: paths) { case (i, path) =>
-        val node = Node(context resolve path)
-        try {
-          val (data, status) = node.get()
-          if (count > 1) println(s"${node.path}:")
-          display(data, opts)
-          if (count > 1 && i < count) println()
-        } catch {
-          case _: NoNodeException => println(s"${node.path}: no such node")
-        }
-        i + 1
-      }
+      implicit val opts = parser parse args
+      val display = displayOpt
+      val nodes = pathArgs map { path => Node(context resolve path) }
+      get(nodes, display)
       context
     }
   }
 
-  private def displayHex(data: Array[Byte], opts: OptResult) {
+  def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
+    implicit val opts = parser parse args
+    val display = displayOpt
+
+    def apply(node: Node): Unit = {
+      get(Seq(node), display)
+    }
+  }
+
+  private def get(nodes: Seq[Node], display: DisplayFunction): Unit = {
+    val count = nodes.size
+    (1 /: nodes) { case (i, node) =>
+      try {
+        val (data, _) = node.get()
+        if (count > 1) println(s"${node.path}:")
+        display(data)
+        if (count > 1 && i < count) println()
+      } catch {
+        case _: NoNodeException => println(s"${node.path}: no such node")
+      }
+      i + 1
+    }
+  }
+
+  private def displayOpt(implicit opts: OptResult): DisplayFunction = {
+    if (opts[Boolean]("hex")) displayHex _
+    else if (opts[Boolean]("binary")) displayBinary _
+    else if (opts[Boolean]("string")) displayString(opts[Charset]("encoding")) _
+    else displayHex _
+  }
+
+  private def pathArgs(implicit opts: OptResult): Seq[Path] = opts.args match {
+    case Seq() => Seq(Path(""))
+    case paths => paths map { Path(_) }
+  }
+
+  private def displayHex(data: Array[Byte]) {
     @tailrec def display(n: Int) {
       def charOf(b: Byte) = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
 
-      def pad(n: Int) = Array.fill(n)(' ') mkString
+      def pad(n: Int) = " " * n
 
       if (n < data.length) {
         val l = Math.min(n + 16, data.length) - n
@@ -99,11 +118,11 @@ options:
     display(0)
   }
 
-  private def displayString(data: Array[Byte], opts: OptResult) = {
-    val cs = opts[Charset]("encoding")
-    println(new String(data, cs))
+  private def displayString(encoding: Charset)(data: Array[Byte]) = {
+    println(new String(data, encoding))
   }
 
-  private def displayBinary(data: Array[Byte], opts: OptResult) =
+  private def displayBinary(data: Array[Byte]) = {
     Console.out.write(data, 0, data.length)
+  }
 }

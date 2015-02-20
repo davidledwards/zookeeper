@@ -3,8 +3,8 @@ A new command line program designed to replace `zkCli.sh`, which comes with the 
 cleaner and easier to use.
 
 ## Build Instructions
-In order to build the corresponding artifacts, you must install [Java 1.7](http://www.java.com/en/download/) or
-higher and [sbt 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html).
+In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/) or
+higher and [sbt 0.13.7](http://www.scala-sbt.org/0.13/tutorial/Setup.html).
 
 Note that this project depends on `zookeeper-client`, so it must be built before proceeding.
 
@@ -15,18 +15,18 @@ sbt publishLocal
 
 ## Installing the CLI
 A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies.
-The only exception is Java 1.7, which must be separately installed on the target machine. The Scala runtime is included in the
+The only exception is Java 1.6, which must be separately installed on the target machine. The Scala runtime is included in the
 assembly, so there is no need for explicit installation.
 
-The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.2.1/tars/`.
+The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.3/tars/`.
 * `zookeeper-cli.tar.gz`
 
 Alternatively, these artifacts can be downloaded from the
-[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.2.1/).
+[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.3/).
 
 Unpacking this assembly will produce the following output:
 ```
-zookeeper-cli-1.2.1/
+zookeeper-cli-1.3/
 + bin/
   + zk
   + zk.bat
@@ -35,7 +35,7 @@ zookeeper-cli-1.2.1/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.2.1/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.3/bin/zk` in your PATH or create an alias.
 
 ## Helpful Tips
 The `zk` program uses [JLine](https://github.com/jline/jline2) for console input similar to what you might expect in
@@ -57,12 +57,31 @@ _current working path_.
 Both `.` and `..` can be used in path expressions.
 
 ## Invoking `zk`
+### Getting help from the command line
 Show `zk` usage information.
 ```
 $ zk
 $ zk -?
 $ zk --help
 ```
+
+Show list of commands.
+```
+$ zk --help help
+$ zk -? help
+```
+
+Display usage information for the `ls` command.
+```
+$ zk --help ls
+$ zk -? ls
+```
+
+Print version information.
+```
+$ zk --version
+```
+
 ### Connecting to a cluster
 Connect to a ZooKeeper cluster by specifying at least one of its servers.
 ```
@@ -200,6 +219,11 @@ Show internal ZooKeeper state of nodes `this` and `that`.
 zk> stat this that
 ```
 
+Show state of node `/foo` in compact format.
+```
+zk> stat -c /foo
+```
+
 Show ACL for node `/zookeeper`.
 ```
 zk> getacl /zookeeper
@@ -268,6 +292,57 @@ Recursively delete node `instances` and its children, forcefully doing so withou
 zk> rm -r -f instances
 ```
 
+### Finding nodes
+The `find` command can be very useful, but also quite destructive when applying mutating operations. A general rule of thumb
+is to verify nodes that are expected to match the regular expression before applying commands that modify state. All patterns
+are strictly regular expressions as defined by Java 6 (http://bit.ly/zk-regex).
+
+Find and print all nodes matching the regular expression `locks` relative to node `foo`. Note in the first example that the
+`print` operation is assumed if omitted.
+```
+zk> find locks foo
+zk> find locks foo --exec print
+```
+
+Recursively find and print all nodes matching the regular expression `lock_.*` relative to node `foo`.
+```
+zk> find -r lock_.* foo
+```
+
+Recursively find all nodes matching `locks` relative to node `foo` and create a child node with the prefix `lock_` whose
+suffix is a monotonically-increasing sequence and whose associated data is `this is a lock`.
+```
+zk> find -r locks foo --exec mk -S lock_ "this is a lock"
+```
+
+Display data in string format for all nodes relative to `foo/locks` matching the regular expression `lock_\d+`.
+```
+zk> find lock_\d+ foo/locks --exec get -s
+```
+
+Set data for all nodes relative to `foo/locks` matching the regular expression `lock_\d+` to the value `this was a lock`.
+```
+zk> find lock_\d+ foo/locks --exec set "this was a lock"
+```
+
+Find all nodes relative to `foo/locks` matching the regular expression `lock_\d+` and recursively delete those nodes and
+their children.
+```
+zk> find lock_\d+ foo/locks --exec rm -r
+```
+
+Tell `find` to suppress display of matching nodes.
+```
+zk> find --quiet ...
+zk> find -q ...
+```
+
+Tell `find` to stop executing the given command on error (default is to continue to the next node).
+```
+zk> find --halt ...
+zk> find -h ...
+```
+
 ### Other useful commands
 Show configuration of `zk` connection to a ZooKeeper cluster, including the session state and location of the log file.
 ```
@@ -280,7 +355,7 @@ zk> quit
 ```
 
 ## License
-Copyright 2013 David Edwards
+Copyright 2015 David Edwards
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -1,5 +1,5 @@
 // For signing artifacts.
-addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8.3")
+addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")
 
 // For creating distribution.
-addSbtPlugin("org.xerial.sbt" % "sbt-pack" % "0.5.1")
+addSbtPlugin("org.xerial.sbt" % "sbt-pack" % "0.6.5")

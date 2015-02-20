@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.zookeeper._
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 import org.apache.log4j.Level
 
-object ConfigCommand {
+object Config {
   val Usage = """usage: config
 
   Shows connection information and session state.
@@ -39,7 +39,7 @@ object ConfigCommand {
   be stopped before a new session can be established.
 """
 
-  def apply(config: Configuration, log: Option[(File, Level)], state: AtomicReference[StateEvent]) = new Command {
+  def command(config: Configuration, log: Option[(File, Level)], state: AtomicReference[StateEvent]) = new CommandProcessor {
     def apply(cmd: String, args: Seq[String], context: Path) = {
       val servers = config.servers map { s => s.getHostName + ":" + s.getPort } mkString ","
       val path = Path("/").resolve(config.path).normalize

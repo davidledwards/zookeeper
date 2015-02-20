@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli._
 
-object HelpCommand {
+object Help {
   val Usage = """Type `help COMMAND` for more information.
 
   The TAB key can be used to auto-complete commands and node paths. Pressing
@@ -42,44 +43,43 @@ commands:
   rm, del        delete existing node
   getacl         get node ACL
   setacl         set node ACL
+  find           find nodes matching expression
   config         show connection information and session state
   help, ?        show available commands
   exit, quit     exit program
 """
 
   private val Commands = Map(
-        "ls" -> ListCommand.Usage,
-        "dir" -> ListCommand.Usage,
-        "cd" -> CdCommand.Usage,
-        "pwd" -> PwdCommand.Usage,
-        "get" -> GetCommand.Usage,
-        "set" -> SetCommand.Usage,
-        "stat" -> StatCommand.Usage,
-        "info" -> StatCommand.Usage,
-        "mk" -> CreateCommand.Usage,
-        "create" -> CreateCommand.Usage,
-        "rm" -> DeleteCommand.Usage,
-        "del" -> DeleteCommand.Usage,
-        "getacl" -> GetACLCommand.Usage,
-        "setacl" -> SetACLCommand.Usage,
-        "config" -> ConfigCommand.Usage,
-        "help" -> HelpCommand.Usage,
-        "exit" -> QuitCommand.Usage,
-        "quit" -> QuitCommand.Usage
+        "ls" -> Ls.Usage,
+        "dir" -> Ls.Usage,
+        "cd" -> Cd.Usage,
+        "pwd" -> Pwd.Usage,
+        "get" -> Get.Usage,
+        "set" -> Set.Usage,
+        "stat" -> Stat.Usage,
+        "info" -> Stat.Usage,
+        "mk" -> Mk.Usage,
+        "create" -> Mk.Usage,
+        "rm" -> Rm.Usage,
+        "del" -> Rm.Usage,
+        "getacl" -> GetACL.Usage,
+        "setacl" -> SetACL.Usage,
+        "find" -> Find.Usage,
+        "config" -> Config.Usage,
+        "help" -> Help.Usage,
+        "exit" -> Quit.Usage,
+        "quit" -> Quit.Usage
         )
 
-  def apply() = new Command {
+  def command() = new CommandProcessor {
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      if (args.isEmpty)
-        println(Usage)
-      else {
-        val cmd = args.head
-        Commands get cmd match {
-          case Some(usage) => println(usage)
-          case _ => println(s"$cmd: no such command")
-        }
+      args match {
+        case Seq(c, _*) => println(usageOf(c))
+        case _ => println(Usage)
       }
       context
     }
   }
+
+  def usageOf(cmd: String): String = Commands.getOrElse(cmd, s"$cmd: no such command")
 }
