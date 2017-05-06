@@ -1,68 +1,71 @@
-name := "zookeeper-client"
-
-organization := "com.loopfor.zookeeper"
-
-version := "1.3"
-
-description := "Scala API for ZooKeeper"
-
-homepage := Some(url("https://github.com/davidledwards/zookeeper"))
-
-licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
-
-scmInfo := Some(ScmInfo(
-  url("https://github.com/davidledwards/zookeeper/tree/release-" + version.value + "/zookeeper-client"),
-  "scm:git:https://github.com/davidledwards/zookeeper.git",
-  Some("scm:git:https://github.com/davidledwards/zookeeper.git")
-))
-
-scalaVersion := "2.11.5"
-
-scalacOptions ++= Seq(
-  "-deprecation",
-  "-unchecked",
-  "-feature",
-  "-encoding", "UTF-8"
+lazy val compilerSettings = Seq(
+  scalaVersion := "2.12.2",
+  scalacOptions ++= Seq(
+    "-target:jvm-1.8",
+    "-deprecation",
+    "-unchecked",
+    "-feature",
+    "-encoding", "UTF-8"
+  )
 )
 
-javacOptions ++= Seq(
-  "-source", "1.6",
-  "-target", "1.6"
+lazy val dependencySettings = Seq(
+  libraryDependencies ++= Seq(
+    "org.apache.zookeeper" % "zookeeper" % "3.4.10"
+      exclude("jline", "jline"),
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+  )
 )
 
-// Compile dependencies.
-libraryDependencies ++= Seq(
-  "org.apache.zookeeper" % "zookeeper" % "3.4.6"
-    exclude("jline", "jline"),
-  "log4j" % "log4j" % "1.2.16"
-    exclude("javax.jms", "jms")
+lazy val docSettings = Seq(
+  scalacOptions in (Compile, doc) ++= Seq("-no-link-warnings"),
+  autoAPIMappings := true,
+  apiURL := Some(url("http://www.loopfor.com/zookeeper/api/1.4/"))
 )
 
-// Test dependencies.
-libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "2.2.4" % "test"
+lazy val publishSettings = Seq(
+  pomIncludeRepository := { _ => false },
+  pomExtra :=
+    <developers>
+      <developer>
+        <id>davidledwards</id>
+        <name>David Edwards</name>
+        <email>david.l.edwards@gmail.com</email>
+      </developer>
+    </developers>,
+  publishMavenStyle := true,
+  publishArtifact in Test := false,
+  publishTo := Some(
+    if (version.value endsWith "SNAPSHOT")
+      "Sonatype Nexus Snapshot Repository" at "https://oss.sonatype.org/content/repositories/snapshots/"
+    else
+      "Sonatype Nexus Release Repository" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+  )
 )
 
-publishMavenStyle := true
+lazy val eclipseSettings = {
+  import EclipseKeys._
+  Seq(
+    executionEnvironment := Some(EclipseExecutionEnvironment.JavaSE18)
+  )
+}
 
-publishArtifact in Test := false
-
-publishTo := Some(
-  if (version.value endsWith "SNAPSHOT")
-    "Sonatype Nexus Snapshot Repository" at "https://oss.sonatype.org/content/repositories/snapshots/"
-  else
-    "Sonatype Nexus Release Repository" at "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-)
-
-// Ensures that published POM has no repository dependencies.
-pomIncludeRepository := { _ => false }
-
-pomExtra := (
-  <developers>
-    <developer>
-      <id>davidledwards</id>
-      <name>David Edwards</name>
-      <email>david.l.edwards@gmail.com</email>
-    </developer>
-  </developers>
-)
+lazy val rootProject = (project in file(".")).
+  settings(
+    name := "zookeeper-client",
+    organization := "com.loopfor.zookeeper",
+    version := "1.4",
+    description := "Scala API for ZooKeeper",
+    homepage := Some(url("https://github.com/davidledwards/zookeeper")),
+    licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
+    scmInfo := Some(ScmInfo(
+      url("https://github.com/davidledwards/zookeeper/tree/release-" + version.value + "/zookeeper-client"),
+      "scm:git:https://github.com/davidledwards/zookeeper.git",
+      Some("scm:git:https://github.com/davidledwards/zookeeper.git")
+    ))
+  ).
+  settings(compilerSettings: _*).
+  settings(dependencySettings: _*).
+  settings(docSettings: _*).
+  settings(publishSettings: _*).
+  settings(eclipseSettings: _*)

@@ -105,18 +105,19 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser =
-      ("recursive", 'r') ~> enable ~~ false ++
-      ("verbose", 'v') ~> enable ~~ true ++
-      ("quiet", 'q') ~> enable ~~ false ++
-      ("halt", 'h') ~> enable ~~ false
+    val opts =
+      ("recursive", 'r') ~> just(true) ~~ false ::
+      ("verbose", 'v') ~> just(true) ~~ true ::
+      ("quiet", 'q') ~> just(true) ~~ false ::
+      ("halt", 'h') ~> just(true) ~~ false ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val recurse = recursiveOpt
-      val verbose = verboseOpt
-      val halt = haltOpt
-      val (pattern, afterPattern) = patternArg
+      val optr = opts <~ args
+      val recurse = optr[Boolean]("recursive")
+      val verbose = !optr[Boolean]("quiet")
+      val halt = optr[Boolean]("halt")
+      val (pattern, afterPattern) = patternArg(optr)
       val (path, afterPath) = pathArg(afterPattern)
       val exec = execArg(afterPath)
 
@@ -173,13 +174,7 @@ options:
     }
   }
 
-  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
-
-  private def verboseOpt(implicit opts: OptResult): Boolean = !opts[Boolean]("quiet")
-
-  private def haltOpt(implicit opts: OptResult): Boolean = opts("halt")
-
-  private def patternArg(implicit opts: OptResult): (Regex, Seq[String]) = opts.args match {
+  private def patternArg(optr: OptResult): (Regex, Seq[String]) = optr.args match {
     case Seq(pattern, rest @ _*) =>
       (try pattern.r catch {
         case _: PatternSyntaxException => complain(s"$pattern: invalid regular expression")

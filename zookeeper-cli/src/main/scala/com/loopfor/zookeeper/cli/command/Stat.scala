@@ -35,24 +35,25 @@ options:
 
   private val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
 
-  private lazy val parser =
-    ("compact", 'c') ~> enable ~~ false
+  private lazy val opts =
+    ("compact", 'c') ~> just(formatCompact _) ~~ formatLong _ ::
+    Nil
 
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val format = formatOpt
-      val nodes = pathArgs map { path => Node(context resolve path) }
+      val optr = opts <~ args
+      val format = optr[FormatFunction]("compact")
+      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
       stat(nodes, format)
       context
     }
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    implicit val opts = parser parse args
-    val format = formatOpt
+    val optr = opts <~ args
+    val format = optr[FormatFunction]("compact")
 
     def apply(node: Node): Unit = {
       stat(Seq(node), format)
@@ -73,11 +74,7 @@ options:
     }
   }
 
-  private def formatOpt(implicit opts: OptResult): FormatFunction = {
-    if (opts[Boolean]("compact")) formatCompact _ else formatLong _
-  }
-
-  private def pathArgs(implicit opts: OptResult): Seq[Path] = opts.args match {
+  private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
     case paths => paths map { Path(_) }
   }

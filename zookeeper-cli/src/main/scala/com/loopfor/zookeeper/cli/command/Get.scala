@@ -43,27 +43,28 @@ options:
 
   private type DisplayFunction = Array[Byte] => Unit
 
-  private lazy val parser =
-    ("hex", 'h') ~> enable ~~ false ++
-    ("string", 's') ~> enable ~~ false ++
-    ("binary", 'b') ~> enable ~~ false ++
-    ("encoding", 'e') ~> asCharset ~~ UTF_8
+  private lazy val opts =
+    ("hex", 'h') ~> just(true) ~~ false ::
+    ("string", 's') ~> just(true) ~~ false ::
+    ("binary", 'b') ~> just(true) ~~ false ::
+    ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
+    Nil
 
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val display = displayOpt
-      val nodes = pathArgs map { path => Node(context resolve path) }
+      val optr = opts <~ args
+      val display = displayOpt(optr)
+      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
       get(nodes, display)
       context
     }
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    implicit val opts = parser parse args
-    val display = displayOpt
+    val optr = opts <~ args
+    val display = displayOpt(optr)
 
     def apply(node: Node): Unit = {
       get(Seq(node), display)
@@ -85,14 +86,14 @@ options:
     }
   }
 
-  private def displayOpt(implicit opts: OptResult): DisplayFunction = {
-    if (opts[Boolean]("hex")) displayHex _
-    else if (opts[Boolean]("binary")) displayBinary _
-    else if (opts[Boolean]("string")) displayString(opts[Charset]("encoding")) _
+  private def displayOpt(optr: OptResult): DisplayFunction = {
+    if (optr[Boolean]("hex")) displayHex _
+    else if (optr[Boolean]("binary")) displayBinary _
+    else if (optr[Boolean]("string")) displayString(optr[Charset]("encoding")) _
     else displayHex _
   }
 
-  private def pathArgs(implicit opts: OptResult): Seq[Path] = opts.args match {
+  private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
     case paths => paths map { Path(_) }
   }

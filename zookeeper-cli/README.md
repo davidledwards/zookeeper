@@ -2,31 +2,20 @@
 A new command line program designed to replace `zkCli.sh`, which comes with the ZooKeeper distribution. This program is much
 cleaner and easier to use.
 
-## Build Instructions
-In order to build the corresponding artifacts, you must install [Java 1.6](http://www.java.com/en/download/) or
-higher and [sbt 0.13.7](http://www.scala-sbt.org/0.13/tutorial/Setup.html).
-
-Note that this project depends on `zookeeper-client`, so it must be built before proceeding.
-
-In the root directory `zookeeper-cli`, the following command will build the project and install in your local Ivy repository:
-```
-sbt publishLocal
-```
-
 ## Installing the CLI
 A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies.
-The only exception is Java 1.6, which must be separately installed on the target machine. The Scala runtime is included in the
+The only exception is Java 1.8, which must be separately installed on the target machine. The Scala runtime is included in the
 assembly, so there is no need for explicit installation.
 
-The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.3/tars/`.
+The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.4/tars/`.
 * `zookeeper-cli.tar.gz`
 
 Alternatively, these artifacts can be downloaded from the
-[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.3/).
+[Sonatype Repository](https://oss.sonatype.org/content/groups/public/com/loopfor/zookeeper/zookeeper-cli/1.4/).
 
 Unpacking this assembly will produce the following output:
 ```
-zookeeper-cli-1.3/
+zookeeper-cli-1.4/
 + bin/
   + zk
   + zk.bat
@@ -35,7 +24,7 @@ zookeeper-cli-1.3/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.3/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.4/bin/zk` in your PATH or create an alias.
 
 ## Helpful Tips
 The `zk` program uses [JLine](https://github.com/jline/jline2) for console input similar to what you might expect in

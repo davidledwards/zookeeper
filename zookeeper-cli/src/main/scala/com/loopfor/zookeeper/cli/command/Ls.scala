@@ -38,26 +38,28 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser =
-      ("recursive", 'r') ~> enable ~~ false ++
-      ("long", 'l') ~> set(formatLong _) ~~ formatShort _
+    lazy val opts =
+      ("recursive", 'r') ~> just(true) ~~ false ::
+      ("long", 'l') ~> just(formatLong _) ~~ formatShort _ ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val recurse = recursiveOpt
-      val format = formatOpt
-      val nodes = pathArgs map { path => Node(context resolve path) }
+      val optr = opts <~ args
+      val recurse = optr[Boolean]("recursive")
+      val format = optr[FormatFunction]("long")
+      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
       list(nodes, recurse, format)
       context
     }
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    val parser =
-      ("long", 'l') ~> set(formatLong _) ~~ formatShort _
+    val opts =
+      ("long", 'l') ~> just(formatLong _) ~~ formatShort _ ::
+      Nil
 
-    implicit val opts = parser parse args
-    val format = formatOpt
+    val optr = opts <~ args
+    val format = optr[FormatFunction]("long")
 
     def apply(node: Node): Unit = {
       list(Seq(node), false, format)
@@ -82,11 +84,7 @@ options:
     }
   }
 
-  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
-
-  private def formatOpt(implicit opts: OptResult): FormatFunction = opts("long")
-
-  private def pathArgs(implicit opts: OptResult): Seq[Path] = opts.args match {
+  private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
     case paths => paths map { Path(_) }
   }

@@ -34,12 +34,14 @@ options:
     implicit val _zk = zk
     var last = Path("/")
 
-    lazy val parser = ("check", 'c') ~> enable ~~ false
+    val opts =
+      ("check", 'c') ~> just(true) ~~ false ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val check = checkOpt
-      val path = context.resolve(pathArg(opts.args, last)).normalize
+      val optr = opts <~ args
+      val check = optr[Boolean]("check")
+      val path = context.resolve(pathArg(optr.args, last)).normalize
       if (check) Node(path).exists() match {
         case Some(_) => println(path)
         case _ => println(s"$path: does not exist")

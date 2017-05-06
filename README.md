@@ -7,7 +7,7 @@ The project page with links to documentation can be found at <http://loopfor.com
 * `zookeeper-client` - a functional API layered over the ZooKeeper client
 * `zookeeper-cli` - a much nicer command line program that replaces `zkCli.sh`
 
-See individual subprojects for build instructions. Note that `zookeeper-cli` depends on `zookeeper-client`.
+See individual subprojects for additional information. Note that `zookeeper-cli` depends on `zookeeper-client`.
 
 ## License
 Copyright 2015 David Edwards

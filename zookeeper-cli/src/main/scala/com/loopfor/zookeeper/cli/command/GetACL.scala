@@ -26,21 +26,21 @@ object GetACL {
   which case the current working path is assumed.
 """
 
-  private lazy val parser = OptParser(Seq.empty)
+  private lazy val opts = OptParser(Seq.empty)
 
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      val opts = parser parse args
-      val nodes = opts.args map { path => Node(context resolve path) }
+      val optr = opts <~ args
+      val nodes = optr.args map { path => Node(context resolve path) }
       getACL(nodes)
       context
     }
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    val opts = parser parse args
+    val optr = opts <~ args
 
     def apply(node: Node): Unit = {
       getACL(Seq(node))

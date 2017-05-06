@@ -51,16 +51,17 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser =
-      ("recursive", 'r') ~> enable ~~ false ++
-      ("force", 'f') ~> enable ~~ false ++
-      ("version", 'v') ~> asSomeInt ~~ None
+    val opts =
+      ("recursive", 'r') ~> just(true) ~~ false ::
+      ("force", 'f') ~> just(true) ~~ false ::
+      ("version", 'v') ~> as[Option[Int]] ~~ None ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val recurse = recursiveOpt
-      val version = versionOpt
-      val path = pathArg
+      val optr = opts <~ args
+      val recurse = optr[Boolean]("recursive")
+      val version = versionOpt(optr)
+      val path = pathArg(optr)
       val node = Node(context resolve path)
       delete(node, recurse, version)
       context
@@ -69,10 +70,11 @@ options:
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
     implicit val _zk = zk
-    val parser =
-      ("recursive", 'r') ~> enable ~~ false
-    implicit val opts = parser parse args
-    val recurse = recursiveOpt
+    val opts =
+      ("recursive", 'r') ~> just(true) ~~ false ::
+      Nil
+    val optr = opts <~ args
+    val recurse = optr[Boolean]("recursive")
 
     def apply(node: Node): Unit = {
       delete(node, recurse, None)
@@ -103,19 +105,17 @@ options:
     }
   }
 
-  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
-
-  private def versionOpt(implicit opts: OptResult): Option[Int] = {
-    val force = opts[Boolean]("force")
-    val recurse = opts[Boolean]("recursive")
+  private def versionOpt(optr: OptResult): Option[Int] = {
+    val force = optr[Boolean]("force")
+    val recurse = optr[Boolean]("recursive")
     if (force || recurse) None
-    else opts[Option[Int]]("version") match {
+    else optr[Option[Int]]("version") match {
       case None => complain("version must be specified; otherwise use --force")
       case v => v
     }
   }
 
-  private def pathArg(implicit opts: OptResult): Path = opts.args match {
+  private def pathArg(optr: OptResult): Path = optr.args match {
     case Seq(path, _*) => Path(path)
     case Seq() => complain("path must be specified")
   }

@@ -74,18 +74,19 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser =
-      ("add", 'a') ~> enable ~~ false ++
-      ("remove", 'r') ~> enable ~~ false ++
-      ("set", 's') ~> enable ~~ false ++
-      ("force", 'f') ~> enable ~~ false ++
-      ("version", 'v') ~> asSomeInt ~~ None
+    val opts =
+      ("add", 'a') ~> just(true) ~~ false ::
+      ("remove", 'r') ~> just(true) ~~ false ::
+      ("set", 's') ~> just(true) ~~ false ::
+      ("force", 'f') ~> just(true) ~~ false ::
+      ("version", 'v') ~> as[Option[Int]] ~~ None ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val action = actionOpt
-      val version = versionOpt
-      val (path, afterPath) = pathArg
+      val optr = opts <~ args
+      val action = actionOpt(optr)
+      val version = versionOpt(optr)
+      val (path, afterPath) = pathArg(optr)
       val acl = aclArgs(afterPath)
       val node = Node(context resolve path)
       setACL(node, version, action, acl)
@@ -94,13 +95,14 @@ options:
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    val parser =
-      ("add", 'a') ~> enable ~~ false ++
-      ("remove", 'r') ~> enable ~~ false ++
-      ("set", 's') ~> enable ~~ false
-    implicit val opts = parser parse args
-    val action = actionOpt
-    val acl = aclArgs(opts.args)
+    val opts =
+      ("add", 'a') ~> just(true) ~~ false ::
+      ("remove", 'r') ~> just(true) ~~ false ::
+      ("set", 's') ~> just(true) ~~ false ::
+      Nil
+    val optr = opts <~ args
+    val action = actionOpt(optr)
+    val acl = aclArgs(optr.args)
 
     def apply(node: Node): Unit = {
       setACL(node, None, action, acl)
@@ -127,23 +129,23 @@ options:
     }
   }
 
-  private def actionOpt(implicit opts: OptResult): Symbol = {
-    if (opts[Boolean]("set")) 'set
-    else if (opts[Boolean]("add")) 'add
-    else if (opts[Boolean]("remove")) 'remove
+  private def actionOpt(optr: OptResult): Symbol = {
+    if (optr[Boolean]("set")) 'set
+    else if (optr[Boolean]("add")) 'add
+    else if (optr[Boolean]("remove")) 'remove
     else 'set
   }
 
-  private def versionOpt(implicit opts: OptResult): Option[Int] = {
-    val force = opts[Boolean]("force")
+  private def versionOpt(optr: OptResult): Option[Int] = {
+    val force = optr[Boolean]("force")
     if (force) None
-    else opts[Option[Int]]("version") match {
+    else optr[Option[Int]]("version") match {
       case None => complain("version must be specified; otherwise use --force")
       case v => v
     }
   }
 
-  private def pathArg(implicit opts: OptResult): (Path, Seq[String]) = opts.args match {
+  private def pathArg(optr: OptResult): (Path, Seq[String]) = optr.args match {
     case Seq(path, rest @ _*) => (Path(path), rest)
     case Seq() => complain("path must be specified")
   }

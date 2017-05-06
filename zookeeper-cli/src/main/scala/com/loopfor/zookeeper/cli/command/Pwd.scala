@@ -31,17 +31,17 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser = ("check", 'c') ~> enable ~~ false
+    val opts =
+      ("check", 'c') ~> just(true) ~~ false ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val check = checkOpt
+      val optr = opts <~ args
+      val check = optr[Boolean]("check")
       print(context)
       if (check && Node(context).exists().isEmpty) print(": does not exist")
       println()
       context
     }
   }
-
-  private def checkOpt(implicit opts: OptResult): Boolean = opts("check")
 }

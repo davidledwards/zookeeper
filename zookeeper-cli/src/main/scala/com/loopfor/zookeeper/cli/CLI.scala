@@ -85,23 +85,27 @@ options:
       println(Usage)
       0
     } else {
-      implicit val opts = parser parse args
-      if (versionOpt) {
+      val optr = opts <~ args
+      if (optr[Boolean]("version")) {
         println(s"zk ${Version.CLI}")
         0
       } else {
-        helpOpt match {
-          case Some(cmd) =>
-            println(if (cmd == "") Usage else Help.usageOf(cmd))
+        optr.get[Option[String]]("help") match {
+          case Some(opt) =>
+            val help = opt match {
+              case Some(cmd) => Help.usageOf(cmd)
+              case None => Usage
+            }
+            println(help)
             0
           case None =>
-            val path = pathOpt
-            val timeout = timeoutOpt
-            val readonly = readonlyOpt
-            val commands = commandsOpt
-            val verbose = verboseOpt
-            val log = logOpt
-            val servers = serverArgs
+            val path = optr[String]("path")
+            val timeout = optr[Duration]("timeout")
+            val readonly = optr[Boolean]("readonly")
+            val commands = commandsOpt(optr)
+            val verbose = !optr[Boolean]("quiet")
+            val log = logOpt(optr)
+            val servers = serverArgs(optr)
 
             val rc = log match {
               case Some((file, level)) =>
@@ -209,44 +213,30 @@ options:
     }
   }
 
-  private lazy val parser =
-    "version" ~> enable ~~ false ++
-    ("help", '?') ~> { (args, results) => args.headOption match {
-      case Some(arg) =>
-        if ((arg startsWith "-") || (arg startsWith "--")) (args, Some(""))
-        else (args.tail, Some(arg))
-      case _ => (args, Some(""))
-    }} ~~ None ++
-    ("path", 'p') ~> asString ~~ "" ++
-    ("timeout", 't') ~> asInt ~~ 60 ++
-    ("readonly", 'r') ~> enable ~~ false ++
-    ("command", 'c') ~> asSomeString ~~ None ++
-    ("file", 'f') ~> asSomeString ~~ None ++
-    ("encoding", 'e') ~> asCharset ~~ UTF_8 ++
-    ("quiet", 'q') ~> enable ~~ false ++
-    "log" ~> as { (arg, _) => Some(new File(arg)) } ~~ None ++
-    "level" ~> as { (arg, _) =>
-      Some(arg.toLowerCase match {
-        case "all" => Level.ALL
-        case "info" => Level.INFO
-        case "warn" => Level.WARN
-        case "error" => Level.ERROR
-        case _ => yell(s"$arg: must be one of (all, info, warn, error)")
-      })
-    } ~~ None ++
-    "nolog" ~> enable ~~ false
+  private val opts =
+    "version" ~> just(true) ~~ false ::
+    ("help", '?') ~> maybe[String] ::
+    ("path", 'p') ~> as[String] ~~ "" ::
+    ("timeout", 't') ~> as[Int, Duration] { _.seconds } ~~ 60.seconds ::
+    ("readonly", 'r') ~> just(true) ~~ false ::
+    ("command", 'c') ~> as[Option[String]] ~~ None ::
+    ("file", 'f') ~> as[Option[String]] ~~ None ::
+    ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
+    ("quiet", 'q') ~> just(true) ~~ false ::
+    "log" ~> as[File] ~~ new File(System getProperty "user.home", "zk.log") ::
+    "level" ~> as[Level] ~~ Level.WARN ::
+    "nolog" ~> just(true) ~~ false ::
+    Nil
 
-  private def versionOpt(implicit opts: OptResult): Boolean = opts("version")
+  implicit def argToLevel(arg: String): Either[String, Level] = arg.toLowerCase match {
+    case "all" => Right(Level.ALL)
+    case "info" => Right(Level.INFO)
+    case "warn" => Right(Level.WARN)
+    case "error" => Right(Level.ERROR)
+    case _ => Left(s"$arg: must be one of (all, info, warn, error)")
+  }
 
-  private def helpOpt(implicit opts: OptResult): Option[String] = opts("help")
-
-  private def pathOpt(implicit opts: OptResult): String = opts("path")
-
-  private def timeoutOpt(implicit opts: OptResult): Duration = opts[Int]("timeout") seconds
-
-  private def readonlyOpt(implicit opts: OptResult): Boolean = opts("readonly")
-
-  private def commandsOpt(implicit opts: OptResult): Option[Seq[String]] = {
+  private def commandsOpt(optr: OptResult): Option[Seq[String]] = {
     def read(file: InputStream, cs: Charset): Seq[String] = {
       val f = new BufferedReader(new InputStreamReader(file, cs))
       @tailrec def read(cmds: ArrayBuffer[String]): Seq[String] = {
@@ -255,16 +245,16 @@ options:
       }
       read(ArrayBuffer.empty)
     }
-    val cmds = opts[Option[String]]("file") match {
+    val cmds = optr[Option[String]]("file") match {
       case Some(name) =>
         val file = try new FileInputStream(name) catch {
           case _: FileNotFoundException => CLIException(s"$name: file not found")
           case _: SecurityException => CLIException(s"$name: access denied")
         }
-        try read(file, opts[Charset]("encoding")) catch {
+        try read(file, optr[Charset]("encoding")) catch {
           case e: IOException => CLIException(s"$name: I/O error: ${e.getMessage}")
         } finally file.close()
-      case _ => opts[Option[String]]("command") match {
+      case _ => optr[Option[String]]("command") match {
         case Some(cmd) => Seq(cmd)
         case _ => null
       }
@@ -272,25 +262,25 @@ options:
     Option(cmds)
   }
 
-  private def verboseOpt(implicit opts: OptResult): Boolean = !opts[Boolean]("quiet")
-
-  private def logOpt(implicit opts: OptResult): Option[(File, Level)] = {
-    if (opts[Boolean]("nolog"))
+  private def logOpt(optr: OptResult): Option[(File, Level)] = {
+    if (optr[Boolean]("nolog"))
       None
     else {
-      val file = opts[Option[File]]("log") getOrElse new File(System getProperty "user.home", "zk.log")
-      val level = opts[Option[Level]]("level") getOrElse Level.WARN
+      val file = optr[File]("log")
+      val level = optr[Level]("level")
       Some(file, level)
     }
   }
 
-  private def serverArgs(implicit opts: OptResult): Seq[InetSocketAddress] = {
+  private def serverArgs(optr: OptResult): Seq[InetSocketAddress] = {
+    def isHostChar(c: Char) = {
+      (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'
+    }
     def validated(host: String) = {
-      if (host forall { c => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-        c == '.' || c == '-' || c == '_' }) host
+      if (host forall { isHostChar _ }) host
       else throw CLIException(s"$host: invalid host name")
     }
-    opts.args match {
+    optr.args match {
       case Nil => CLIException("no servers specified")
       case params => params map { server =>
         val i = server indexOf ':'

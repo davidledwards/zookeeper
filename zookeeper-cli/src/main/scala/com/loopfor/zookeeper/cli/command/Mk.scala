@@ -22,6 +22,7 @@ import java.io.{FileInputStream, FileNotFoundException, IOException}
 import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuilder
+import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 object Mk {
@@ -55,31 +56,24 @@ options:
   --acl, -A                  : ACL assigned to node (default=world:anyone=*)
 """
 
-  private val UTF_8 = Charset forName "UTF-8"
-
-  private lazy val parser =
-    ("recursive", 'r') ~> enable ~~ false ++
-    ("encoding", 'e') ~> asCharset ~~ UTF_8 ++
-    ("sequential", 'S') ~> enable ~~ false ++
-    ("ephemeral", 'E') ~> enable ~~ false ++
-    ("acl", 'A') ~> as { (arg, opts) =>
-      val acl = ACL parse arg match {
-        case Success(a) => a
-        case Failure(e) => yell(e.getMessage)
-      }
-      opts("acl").asInstanceOf[Seq[ACL]] :+ acl
-    } ~~ Seq.empty
+  private lazy val opts =
+    ("recursive", 'r') ~> just(true) ~~ false ::
+    ("encoding", 'e') ~> as[Charset] ~~ Charset.forName("UTF-8") ::
+    ("sequential", 'S') ~> just(true) ~~ false ::
+    ("ephemeral", 'E') ~> just(true) ~~ false ::
+    ("acl", 'A') ~>+ as[ACL] ::
+    Nil
 
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val recurse = recursiveOpt
-      val disp = dispOpt
-      val acl = aclOpt
-      val (path, afterPath) = pathArg(false)
-      val data = dataArg(afterPath)
+      val optr = opts <~ args
+      val recurse = optr[Boolean]("recursive")
+      val disp = dispOpt(optr)
+      val acl = aclOpt(optr)
+      val (path, afterPath) = pathArg(optr, false)
+      val data = dataArg(optr, afterPath)
       val node = Node(context resolve path)
       create(node, recurse, disp, acl, data)
       context
@@ -88,12 +82,12 @@ options:
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
     implicit val _zk = zk
-    implicit val opts = parser parse args
-    val recurse = recursiveOpt
-    val disp = dispOpt
-    val acl = aclOpt
-    val (path, afterPath) = pathArg(true)
-    val data = dataArg(afterPath)
+    val optr = opts <~ args
+    val recurse = optr[Boolean]("recursive")
+    val disp = dispOpt(optr)
+    val acl = aclOpt(optr)
+    val (path, afterPath) = pathArg(optr, true)
+    val data = dataArg(optr, afterPath)
 
     def apply(node: Node): Unit = {
       create(node resolve path, recurse, disp, acl, data)
@@ -121,23 +115,21 @@ options:
     }
   }
 
-  private def recursiveOpt(implicit opts: OptResult): Boolean = opts("recursive")
-
-  private def dispOpt(implicit opts: OptResult): Disposition = {
-    val sequential = opts[Boolean]("sequential")
-    val ephemeral = opts[Boolean]("ephemeral")
-    if (sequential && ephemeral) EphemeralSequential
-    else if (sequential) PersistentSequential
-    else if (ephemeral) Ephemeral
-    else Persistent
+  private def dispOpt(optr: OptResult): Disposition = {
+    (optr[Boolean]("sequential"), optr[Boolean]("ephemeral")) match {
+      case (true, true) => EphemeralSequential
+      case (true, false) => PersistentSequential
+      case (false, true) => Ephemeral
+      case (false, false) => Persistent
+    }
   }
 
-  private def aclOpt(implicit opts: OptResult): Seq[ACL] = opts("acl") match {
-    case Seq() => ACL.AnyoneAll
-    case acl => acl
+  private def aclOpt(optr: OptResult): Seq[ACL] = optr.get("acl") match {
+    case Some(acl) => acl
+    case None => ACL.AnyoneAll
   }
 
-  private def pathArg(relative: Boolean)(implicit opts: OptResult): (Path, Seq[String]) = opts.args match {
+  private def pathArg(optr: OptResult, relative: Boolean): (Path, Seq[String]) = optr.args match {
     case Seq(path, rest @ _*) =>
       val p = Path(path)
       (if (relative) p.path.headOption match {
@@ -147,7 +139,7 @@ options:
     case Seq() => complain("path must be specified")
   }
 
-  private def dataArg(args: Seq[String])(implicit opts: OptResult): Array[Byte] = args match {
+  private def dataArg(optr: OptResult, args: Seq[String]): Array[Byte] = args match {
     case Seq(data, _*) => data.headOption match {
       case Some('@') =>
         val name = data drop 1
@@ -159,7 +151,7 @@ options:
           case e: IOException => complain(s"$name: I/O error: ${e.getMessage}")
         } finally
           file.close()
-      case _ => data getBytes opts[Charset]("encoding")
+      case _ => data getBytes optr[Charset]("encoding")
     }
     case Seq() => Array.empty[Byte]
   }
@@ -170,5 +162,10 @@ options:
       if (c == -1) buffer.result else read(buffer += c.toByte)
     }
     read(ArrayBuilder.make[Byte])
+  }
+
+  implicit def argToACL(arg: String): Either[String, ACL] = ACL.parse(arg) match {
+    case Success(acl) => Right(acl)
+    case Failure(e) => Left(e.getMessage)
   }
 }

@@ -48,16 +48,17 @@ options:
   def command(zk: Zookeeper) = new CommandProcessor {
     implicit val _zk = zk
 
-    lazy val parser =
-      ("encoding", 'e') ~> asCharset ~~ UTF_8 ++
-      ("version", 'v') ~> asSomeInt ~~ None ++
-      ("force", 'f') ~> enable ~~ false
+    val opts =
+      ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
+      ("version", 'v') ~> as[Option[Int]] ~~ None ::
+      ("force", 'f') ~> just(true) ~~ false ::
+      Nil
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
-      implicit val opts = parser parse args
-      val version = versionOpt
-      val (path, afterPath) = pathArg
-      val data = dataArg(afterPath)
+      val optr = opts <~ args
+      val version = versionOpt(optr)
+      val (path, afterPath) = pathArg(optr)
+      val data = dataArg(optr, afterPath)
       val node = Node(context resolve path)
       set(node, version, data)
       context
@@ -65,10 +66,11 @@ options:
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    val parser =
-      ("encoding", 'e') ~> asCharset ~~ UTF_8
-    implicit val opts = parser parse args
-    val data = dataArg(opts.args)
+    val opts =
+      ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
+      Nil
+    val optr = opts <~ args
+    val data = dataArg(optr, optr.args)
 
     def apply(node: Node): Unit = {
       set(node, None, data)
@@ -82,21 +84,21 @@ options:
     }
   }
 
-  private def versionOpt(implicit opts: OptResult): Option[Int] = {
-    val force = opts[Boolean]("force")
+  private def versionOpt(optr: OptResult): Option[Int] = {
+    val force = optr[Boolean]("force")
     if (force) None
-    else opts[Option[Int]]("version") match {
+    else optr[Option[Int]]("version") match {
       case None => complain("version must be specified; otherwise use --force")
       case v => v
     }
   }
 
-  private def pathArg(implicit opts: OptResult): (Path, Seq[String]) = opts.args match {
+  private def pathArg(optr: OptResult): (Path, Seq[String]) = optr.args match {
     case Seq(path, rest @ _*) => (Path(path), rest)
     case Seq() => complain("path must be specified")
   }
 
-  private def dataArg(args: Seq[String])(implicit opts: OptResult): Array[Byte] = args match {
+  private def dataArg(optr: OptResult, args: Seq[String]): Array[Byte] = args match {
     case Seq(data, _*) => data.headOption match {
       case Some('@') =>
         val name = data drop 1
@@ -108,7 +110,7 @@ options:
           case e: IOException => complain(s"$name: I/O error: ${e.getMessage}")
         } finally
           file.close()
-      case _ => data getBytes opts[Charset]("encoding")
+      case _ => data getBytes optr[Charset]("encoding")
     }
     case Seq() => Array.empty[Byte]
   }
