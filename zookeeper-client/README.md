@@ -4,11 +4,11 @@ A functional API layered over the ZooKeeper client.
 
 ## Documentation
 
-API documentation can be found [here](http://loopfor.com/zookeeper/api/1.4/com/loopfor/zookeeper/index.html).
+API documentation can be found [here](https://davidedwards.io/zookeeper/api/1.4/com/loopfor/zookeeper/index.html).
 
 ## Dependency Information
 
-This library is published in the Maven Central Repository. Dependency information can be found [here](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-client_2.12/1.4/jar).
+This library is published in the Maven Central Repository. Dependency information can be found [here](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-client_2.12/1.4.1/jar).
 
 This release is compiled against _Scala 2.12_, which by extension, depends on _Java 1.8_.
 

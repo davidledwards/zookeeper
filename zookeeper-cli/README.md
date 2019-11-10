@@ -6,16 +6,16 @@ A new command line program designed to replace `zkCli.sh`, which comes with the 
 
 A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies. The only exception is Java 1.8, which must be separately installed on the target machine. The Scala runtime is included in the assembly, so there is no need for explicit installation.
 
-The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.4/tars/`.
+The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.4.1/tars/`.
 
 * `zookeeper-cli.tar.gz`
 
-Alternatively, these artifacts can be downloaded from the [Sonatype Repository](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.4/jar).
+Alternatively, these artifacts can be downloaded from the [Sonatype Repository](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.4.1/tar.gz).
 
 Unpacking this assembly will produce the following output:
 
 ```shell
-zookeeper-cli-1.4/
+zookeeper-cli-1.4.1/
 + bin/
   + zk
   + zk.bat
@@ -24,7 +24,7 @@ zookeeper-cli-1.4/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.4/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.4.1/bin/zk` in your PATH or create an alias.
 
 ## Helpful Tips
 
@@ -392,7 +392,7 @@ zk> rm -r -f instances
 
 ### Finding nodes
 
-The `find` command can be very useful, but also quite destructive when applying mutating operations. A general rule of thumb is to verify nodes that are expected to match the regular expression before applying commands that modify state. All patterns are strictly regular expressions as defined by Java 6 (http://bit.ly/zk-regex).
+The `find` command can be very useful, but also quite destructive when applying mutating operations. A general rule of thumb is to verify nodes that are expected to match the regular expression before applying commands that modify state. All patterns are strictly regular expressions as defined by Java 6 (<http://bit.ly/zk-regex>).
 
 Find and print all nodes matching the regular expression `locks` relative to node `foo`. Note in the first example that the `print` operation is assumed if omitted.
 
