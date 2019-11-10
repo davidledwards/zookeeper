@@ -103,7 +103,7 @@ options:
             val timeout = optr[Duration]("timeout")
             val readonly = optr[Boolean]("readonly")
             val commands = commandsOpt(optr)
-            val verbose = !optr[Boolean]("quiet")
+            val verbose = !optr[Boolean]("quiet") && commands.isEmpty
             val log = logOpt(optr)
             val servers = serverArgs(optr)
 

@@ -30,4 +30,19 @@ class SplitterTest extends FunSuite {
       assert(_args === args)
     }
   }
+
+  test("arguments with quotes") {
+    val tests = Seq(
+      ("""this "foo bar" that""", Seq("this", "foo bar", "that")),
+      ("""this "foo \"and\" bar" that""", Seq("this", """foo "and" bar""", "that")),
+      ("""this "foo \\and\\ bar" that""", Seq("this", """foo \and\ bar""", "that")),
+      ("""this "foo \and\ bar" that""", Seq("this", """foo \and\ bar""", "that")),
+      ("""this "foo and bar" that\""", Seq("this", "foo and bar", """that\"""))
+    )
+
+    tests foreach { case (s, args) =>
+      val _args = Splitter split s
+      assert(_args === args)
+    }
+  }
 }
