@@ -128,6 +128,52 @@ ls -r /hadoop
 ^D
 ```
 
+### Working with quoted strings
+
+In some cases, it becomes necessary to provide arguments, such as commands or values, as quoted strings from either the OS shell or the `zk` shell. The following examples illustrate the correct format, particularly for escaping embedded quotes.
+
+From command shells, such as `zsh` or `bash`.
+
+```shell
+zk -c "set -f /foo \"bar: 7\"" server1.com
+```
+
+The `-c` argument is parsed by the command shell and presented to `zk` as a single argument in the following form.
+
+```shell
+set -f /foo "bar: 7"
+```
+
+The `zk` shell will then split this string into distinct tokens similar to the manner done by `zsh` or `bash`, leading to the following tokens.
+
+```shell
+set
+-f
+/foo
+bar: 7
+```
+
+The following depicts a more complex scenario in which quoted strings tokenized by `zk` contain embedded quotes. Consider a slightly more complicated form of the previous example.
+
+```shell
+zk -c "set -f /foo \"bar: \\\"7\\\"\"" server1.com
+```
+
+The `-c` argument sent to `zk` by the command shell appears as follows.
+
+```shell
+set -f /foo "bar: \"7\""
+```
+
+Which is then tokenized by `zk`.
+
+```shell
+set
+-f
+/foo
+bar: "7"
+```
+
 ### Logging
 
 Send ZooKeeper log messages to a file other than the default of `$HOME/zk.log`.

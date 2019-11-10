@@ -51,6 +51,13 @@ class Splitter(delims: Set[Char]) {
   private def slurpQuote(s: Seq[Char]): (String, Seq[Char]) = {
     @tailrec def slurpQuote(s: Seq[Char], buf: StringBuilder): (String, Seq[Char]) = s.headOption match {
       case Some('"') => (buf.toString, s.tail)
+      case Some('\\') =>
+        val rest = s.tail
+        val (c, _rest) = rest.headOption match {
+          case Some(c) if c == '"' || c == '\\' => (c, rest.tail)
+          case _ => ('\\', rest)
+        }
+        slurpQuote(_rest, buf + c)
       case Some(c) => slurpQuote(s.tail, buf + c)
       case _ => (buf.toString, s)
     }
