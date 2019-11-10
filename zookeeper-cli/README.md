@@ -138,6 +138,12 @@ From command shells, such as `zsh` or `bash`.
 zk -c "set -f /foo \"bar: 7\"" server1.com
 ```
 
+or
+
+```shell
+zk -c 'set -f /foo "bar: 7"' server1.com
+```
+
 The `-c` argument is parsed by the command shell and presented to `zk` as a single argument in the following form.
 
 ```shell
@@ -157,6 +163,12 @@ The following depicts a more complex scenario in which quoted strings tokenized 
 
 ```shell
 zk -c "set -f /foo \"bar: \\\"7\\\"\"" server1.com
+```
+
+or
+
+```shell
+zk -c 'set -f /foo "bar: \"7\""' server1.com
 ```
 
 The `-c` argument sent to `zk` by the command shell appears as follows.
