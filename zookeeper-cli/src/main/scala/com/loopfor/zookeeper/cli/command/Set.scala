@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ options:
       val version = versionOpt(optr)
       val (path, afterPath) = pathArg(optr)
       val data = dataArg(optr, afterPath)
-      val node = Node(context resolve path)
+      val node = Node(context.resolve(path))
       set(node, version, data)
       context
     }
@@ -101,7 +101,7 @@ options:
   private def dataArg(optr: OptResult, args: Seq[String]): Array[Byte] = args match {
     case Seq(data, _*) => data.headOption match {
       case Some('@') =>
-        val name = data drop 1
+        val name = data.drop(1)
         val file = try new FileInputStream(name) catch {
           case _: FileNotFoundException => complain(s"$name: file not found")
           case _: SecurityException => complain(s"$name: access denied")
@@ -110,7 +110,7 @@ options:
           case e: IOException => complain(s"$name: I/O error: ${e.getMessage}")
         } finally
           file.close()
-      case _ => data getBytes optr[Charset]("encoding")
+      case _ => data.getBytes(optr[Charset]("encoding"))
     }
     case Seq() => Array.empty[Byte]
   }
@@ -118,7 +118,7 @@ options:
   private def read(file: FileInputStream): Array[Byte] = {
     @tailrec def read(buffer: ArrayBuilder[Byte]): Array[Byte] = {
       val c = file.read()
-      if (c == -1) buffer.result else read(buffer += c.toByte)
+      if (c == -1) buffer.result() else read(buffer += c.toByte)
     }
     read(ArrayBuilder.make[Byte])
   }

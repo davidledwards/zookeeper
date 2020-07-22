@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,7 +74,8 @@ trait Node {
    * @param data the data to associate with this node, which may be empty, but not `null`
    * @param acl an access control list to apply to this node, which must not be empty
    * @param disp the disposition of this node
-   * @return a new node whose [[path]] will differ is `disp` is either [[PersistentSequential]] or [[EphemeralSequential]]
+   * @return a new node whose [[path]] will differ if `disp` is either [[PersistentSequential]],
+   * [[PersistentSequentialTimeToLive]] or [[EphemeralSequential]]
    * 
    * @see [[SynchronousZookeeper.create]] for further details
    */
@@ -87,7 +88,7 @@ trait Node {
    * 
    * @see [[SynchronousZookeeper.delete]] for further details
    */
-  def delete(version: Option[Int])
+  def delete(version: Option[Int]): Unit
 
   /**
    * Returns the data and status of this node.
@@ -181,9 +182,11 @@ trait Node {
  * Constructs and deconstructs [[Node]] values.
  */
 object Node {
-  def apply(path: String)(implicit zk: Zookeeper): Node = apply(Path(path))(zk)
+  def apply(path: String)(implicit zk: Zookeeper): Node =
+    apply(Path(path))(zk)
 
-  def apply(path: Path)(implicit zk: Zookeeper): Node = new Impl(zk.sync, path.normalize)
+  def apply(path: Path)(implicit zk: Zookeeper): Node =
+    new Impl(zk.sync, path.normalize)
 
   def unapply(node: Node): Option[Path] =
     if (node == null) None else Some(node.path)
@@ -200,14 +203,16 @@ object Node {
       case _ => None
     }
 
-    def resolve(path: String): Node = Node(this.path resolve path)
+    def resolve(path: String): Node =
+      Node(this.path resolve path)
 
-    def resolve(path: Path): Node = resolve(path.path)
+    def resolve(path: Path): Node =
+      resolve(path.path)
 
     def create(data: Array[Byte], acl: Seq[ACL], disp: Disposition): Node =
       Node(zk.create(path.path, data, acl, disp))
 
-    def delete(version: Option[Int]) =
+    def delete(version: Option[Int]): Unit =
       zk.delete(path.path, version)
 
     def get(): (Array[Byte], Status) =
@@ -226,10 +231,10 @@ object Node {
       zk.watch(fn).exists(path.path)
 
     def children(): Seq[Node] =
-      zk.children(path.path) map { c => Node(path resolve c) }
+      zk.children(path.path).map { c => Node(path.resolve(c)) }
 
     def children(fn: PartialFunction[Event, Unit]): Seq[Node] =
-      zk.watch(fn).children(path.path) map { c => Node(path resolve c) }
+      zk.watch(fn).children(path.path).map { c => Node(path.resolve(c)) }
 
     def getACL(): (Seq[ACL], Status) =
       zk.getACL(path.path)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 package com.loopfor.zookeeper
 
 import org.apache.zookeeper.Watcher.Event.{EventType, KeeperState}
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class EventTest extends FunSuite {
+class EventTest extends AnyFunSuite {
   val PATH = "/test"
   val UNRECOGNIZED_STATE = 123456
   val UNRECOGNIZED_EVENT = 123456
@@ -42,6 +42,9 @@ class EventTest extends FunSuite {
     (Expired: StateEvent) match {
       case Expired => ()
     }
+    (Closed: StateEvent) match {
+      case Closed => ()
+    }
   }
 
   test("match NodeEvents") {
@@ -56,6 +59,12 @@ class EventTest extends FunSuite {
     }
     ChildrenChanged(PATH) match {
       case ChildrenChanged(p) if (p == PATH) => ()
+    }
+    ChildWatchRemoved(PATH) match {
+      case ChildWatchRemoved(p) if (p == PATH) => ()
+    }
+    DataWatchRemoved(PATH) match {
+      case DataWatchRemoved(p) if (p == PATH) => ()
     }
   }
 
@@ -78,6 +87,9 @@ class EventTest extends FunSuite {
     StateEvent(KeeperState.Expired) match {
       case Expired => ()
     }
+    StateEvent(KeeperState.Closed) match {
+      case Closed => ()
+    }
   }
 
   test("create NodeEvents from underlying code") {
@@ -92,6 +104,12 @@ class EventTest extends FunSuite {
     }
     NodeEvent(EventType.NodeChildrenChanged, PATH) match {
       case ChildrenChanged(p) if (p == PATH) => ()
+    }
+    NodeEvent(EventType.ChildWatchRemoved, PATH) match {
+      case ChildWatchRemoved(p) if (p == PATH) => ()
+    }
+    NodeEvent(EventType.DataWatchRemoved, PATH) match {
+      case DataWatchRemoved(p) if (p == PATH) => ()
     }
   }
 }

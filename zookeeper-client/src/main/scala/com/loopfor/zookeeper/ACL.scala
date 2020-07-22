@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package com.loopfor.zookeeper
 
 import org.apache.zookeeper.ZooDefs.{Ids, Perms}
 import org.apache.zookeeper.data.{ACL => ZACL}
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.language._
 import scala.util.{Failure, Success, Try}
 
@@ -39,7 +39,7 @@ case class ACL(id: Id, permission: Int) extends ZACL(permission, id.zid)
  * Several commonly used ACL values have been predefined for sake of convenience: [[AnyoneAll]], [[AnyoneRead]],
  * [[CreatorAll]].
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_ZooKeeperAccessControl ACLs]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_ZooKeeperAccessControl ACLs]]
  */
 object ACL {
   /**
@@ -119,10 +119,12 @@ object ACL {
    * containing the offending exception
    */
   def parse(s: String): Try[ACL] = Try {
-    def error(message: String): Nothing = throw new IllegalArgumentException(s"${s}: ${message}")
+    def error(message: String): Nothing =
+      throw new IllegalArgumentException(s"${s}: ${message}")
+  
     s.split("=", 2) match {
       case Array(id, permission) =>
-        (Id parse id) match {
+        Id.parse(id) match {
           case Success(i) =>
             permission match {
               case Permission(p) => ACL(i, p)
@@ -137,10 +139,10 @@ object ACL {
   private[zookeeper] def apply(zacl: ZACL): ACL = ACL(Id(zacl.getId), zacl.getPerms)
 
   private[zookeeper] def apply(zacl: java.util.List[ZACL]): Seq[ACL] =
-    (Seq[ACL]() /: zacl.asScala) { case (acl, zacl) => acl :+ ACL(zacl)}
+    zacl.asScala.foldLeft(Seq[ACL]()) { case (acl, zacl) => acl :+ ACL(zacl)}
 
   private[zookeeper] def toZACL(acl: Seq[ACL]): java.util.List[ZACL] =
-    (Seq[ZACL]() /: acl) { case (zacl, acl) => zacl :+ toZACL(acl) } asJava
+    acl.foldLeft(Seq[ZACL]()) { case (zacl, acl) => zacl :+ toZACL(acl) } asJava
 
   private[zookeeper] def toZACL(acl: ACL): ZACL = acl.asInstanceOf[ZACL]
 
@@ -156,7 +158,7 @@ object ACL {
     def unapply(s: String): Option[Int] = {
       if (s == null) None
       else {
-        val perms = (0 /: s) { case (p, c) =>
+        val perms = s.foldLeft(0) { case (p, c) =>
             if (c == 'r') p | Read
             else if (c == 'w') p | Write
             else if (c == 'c') p | Create

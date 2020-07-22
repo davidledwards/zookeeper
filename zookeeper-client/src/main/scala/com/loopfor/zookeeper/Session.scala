@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ object Session {
 
   private[zookeeper] def apply(zk: ZooKeeper): Session = new Session {
     val credential: Credential = Credential(zk)
-    val timeout: Duration = zk.getSessionTimeout millis
+    val timeout: Duration = zk.getSessionTimeout.millis
 
     override def toString: String = "Session(credential=" + credential + ",timeout=" + timeout + ")"
   }

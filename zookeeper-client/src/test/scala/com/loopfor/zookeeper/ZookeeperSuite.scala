@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,16 @@ package com.loopfor.zookeeper
 
 import org.apache.zookeeper.server.ZooKeeperServer
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.fixture.FunSuite
+import org.scalatest.funsuite.FixtureAnyFunSuite
 import java.util.UUID
 
-abstract class ZookeeperSuite extends FunSuite with BeforeAndAfterAll {
+abstract class ZookeeperSuite extends FixtureAnyFunSuite with BeforeAndAfterAll {
   type FixtureParam = Path
 
   private val server: ZooKeeperServer = ServerFixture()
   implicit val zk: Zookeeper = ClientFixture(server.getClientPort)
 
-  override protected def afterAll {
+  override protected def afterAll(): Unit = {
     zk.close()
     server.shutdown()
   }

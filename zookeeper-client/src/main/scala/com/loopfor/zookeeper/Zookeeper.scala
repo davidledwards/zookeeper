@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,9 @@ import org.apache.zookeeper.{KeeperException => ZException, _}
 import org.apache.zookeeper.KeeperException.Code
 import org.apache.zookeeper.data.{ACL => ZACL, Stat}
 import scala.annotation.tailrec
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration.Duration
+import scala.jdk.CollectionConverters._
 import scala.language._
 
 /**
@@ -91,8 +92,8 @@ trait SynchronousZookeeper extends Zookeeper {
    * @param data the data to associate with the node, which may be empty, but not `null`
    * @param acl an access control list to apply to the node, which must not be empty
    * @param disp the disposition of the node
-   * @return the final path of the created node, which will differ from `path` if `disp` is either [[PersistentSequential]]
-   * or [[EphemeralSequential]]
+   * @return the final path of the created node, which will differ from `path` if `disp` is either [[PersistentSequential]],
+   * [[PersistentSequentialTimeToLive]] or [[EphemeralSequential]]
    */
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): String
 
@@ -271,7 +272,7 @@ trait AsynchronousZookeeper extends Zookeeper {
    * @param acl an access control list to apply to the node, which must not be empty
    * @param disp the disposition of the node
    * @return a future yielding the final path of the created node, which will differ from `path` if `disp` is either
-   * [[PersistentSequential]] or [[EphemeralSequential]]
+   * [[PersistentSequential]], [[PersistentSequentialTimeToLive]] or [[EphemeralSequential]]
    */
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String]
 
@@ -431,7 +432,7 @@ private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
   def async: AsynchronousZookeeper = new AsynchronousZK(zk, exec)
 
   def ensure(path: String): Future[Unit] = {
-    val p = Promise[Unit]
+    val p = Promise[Unit]()
     zk.sync(path, VoidHandler(p), null)
     p.future
   }
@@ -440,11 +441,17 @@ private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
 }
 
 private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZK(zk, exec) with SynchronousZookeeper {
-  def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition) = {
-    zk.create(path, data, ACL.toZACL(acl), disp.mode)
+  def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): String = {
+    val stat = new Stat
+    disp match {
+      case TimeToLive(ttl) =>
+        zk.create(path, data, ACL.toZACL(acl), disp.mode, stat, ttl.toMillis)
+      case _ =>
+        zk.create(path, data, ACL.toZACL(acl), disp.mode, stat)
+    }
   }
 
-  def delete(path: String, version: Option[Int]) {
+  def delete(path: String, version: Option[Int]): Unit = {
     zk.delete(path, version getOrElse -1)
   }
 
@@ -455,7 +462,7 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
   }
 
   def set(path: String, data: Array[Byte], version: Option[Int]): Status = {
-    val stat = zk.setData(path, data, version getOrElse -1)
+    val stat = zk.setData(path, data, version.getOrElse(-1))
     Status(path, stat)
   }
 
@@ -475,7 +482,7 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
   }
 
   def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Status = {
-    val stat = zk.setACL(path, ACL.toZACL(acl), version getOrElse -1)
+    val stat = zk.setACL(path, ACL.toZACL(acl), version.getOrElse(-1))
     Status(path, stat)
   }
 
@@ -485,10 +492,10 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
 
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]] = {
     try {
-      val _ops = ops map { _.op }
+      val _ops = ops.map { _.op }
       val results = zk.multi(_ops.asJava).asScala
-      Right(ops zip results map {
-        case (op, result) => op match {
+      Right(ops.zip(results).map { case (op, result) =>
+        op match {
           case _op: CreateOperation => CreateResult(_op, result.asInstanceOf[OpResult.CreateResult].getPath)
           case _op: DeleteOperation => DeleteResult(_op)
           case _op: SetOperation => SetResult(_op, Status(_op.path, result.asInstanceOf[OpResult.SetDataResult].getStat))
@@ -497,16 +504,15 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
       })
     } catch {
       case e: KeeperException if e.getResults != null =>
-        Left(ops zip e.getResults.asScala map {
-          case (op, result) =>
-            val rc = result.asInstanceOf[OpResult.ErrorResult].getErr
-            val error = if (rc == 0) None else Some(ZException.create(Code.get(rc)))
-            op match {
-              case _op: CreateOperation => CreateProblem(_op, error)
-              case _op: DeleteOperation => DeleteProblem(_op, error)
-              case _op: SetOperation => SetProblem(_op, error)
-              case _op: CheckOperation => CheckProblem(_op, error)
-            }
+        Left(ops.zip(e.getResults.asScala).map { case (op, result) =>
+          val rc = result.asInstanceOf[OpResult.ErrorResult].getErr
+          val error = if (rc == 0) None else Some(ZException.create(Code.get(rc)))
+          op match {
+            case _op: CreateOperation => CreateProblem(_op, error)
+            case _op: DeleteOperation => DeleteProblem(_op, error)
+            case _op: SetOperation => SetProblem(_op, error)
+            case _op: CheckOperation => CheckProblem(_op, error)
+          }
         })
     }
   }
@@ -515,7 +521,7 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
 private class SynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: PartialFunction[Event, Unit])
       extends BaseZK(zk, exec) with SynchronousWatchableZookeeper {
   private[this] val watcher = new Watcher {
-    def process(event: WatchedEvent) {
+    def process(event: WatchedEvent): Unit = {
       val e = Event(event)
       if (fn.isDefinedAt(e)) fn(e)
     }
@@ -541,50 +547,55 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
   private implicit val _exec = exec
 
   def create(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition): Future[String] = {
-    val p = Promise[String]
-    zk.create(path, data, ACL.toZACL(acl), disp.mode, StringHandler(p), null)
+    val p = Promise[String]()
+    disp match {
+      case TimeToLive(ttl) =>
+        zk.create(path, data, ACL.toZACL(acl), disp.mode, CreateHandler(p), null, ttl.toMillis)
+      case _ =>
+        zk.create(path, data, ACL.toZACL(acl), disp.mode, CreateHandler(p), null)
+    }
     p.future
   }
 
   def delete(path: String, version: Option[Int]): Future[Unit] = {
-    val p = Promise[Unit]
-    zk.delete(path, version getOrElse -1, VoidHandler(p), null)
+    val p = Promise[Unit]()
+    zk.delete(path, version.getOrElse(-1), VoidHandler(p), null)
     p.future
   }
 
   def get(path: String): Future[(Array[Byte], Status)] = {
-    val p = Promise[(Array[Byte], Status)]
+    val p = Promise[(Array[Byte], Status)]()
     zk.getData(path, false, DataHandler(p), null)
     p.future
   }
 
   def set(path: String, data: Array[Byte], version: Option[Int]): Future[Status] = {
-    val p = Promise[Status]
-    zk.setData(path, data, version getOrElse -1, StatHandler(p), null)
+    val p = Promise[Status]()
+    zk.setData(path, data, version.getOrElse(-1), StatHandler(p), null)
     p.future
   }
 
   def exists(path: String): Future[Option[Status]] = {
-    val p = Promise[Option[Status]]
+    val p = Promise[Option[Status]]()
     zk.exists(path, false, ExistsHandler(p), null)
     p.future
   }
 
   def children(path: String): Future[(Seq[String], Status)] = {
-    val p = Promise[(Seq[String], Status)]
+    val p = Promise[(Seq[String], Status)]()
     zk.getChildren(path, false, ChildrenHandler(p), null)
     p.future
   }
 
   def getACL(path: String): Future[(Seq[ACL], Status)] = {
-    val p = Promise[(Seq[ACL], Status)]
+    val p = Promise[(Seq[ACL], Status)]()
     zk.getACL(path, new Stat, ACLHandler(p), null)
     p.future
   }
 
   def setACL(path: String, acl: Seq[ACL], version: Option[Int]): Future[Status] = {
-    val p = Promise[Status]
-    zk.setACL(path, ACL.toZACL(acl), version getOrElse -1, StatHandler(p), null)
+    val p = Promise[Status]()
+    zk.setACL(path, ACL.toZACL(acl), version.getOrElse(-1), StatHandler(p), null)
     p.future
   }
 
@@ -598,37 +609,37 @@ private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn:
   private implicit val _exec = exec
 
   private[this] val watcher = new Watcher {
-    def process(event: WatchedEvent) {
+    def process(event: WatchedEvent): Unit = {
       val e = Event(event)
       if (fn.isDefinedAt(e)) fn(e)
     }
   }
 
   def get(path: String): Future[(Array[Byte], Status)] = {
-    val p = Promise[(Array[Byte], Status)]
+    val p = Promise[(Array[Byte], Status)]()
     zk.getData(path, watcher, DataHandler(p), null)
     p.future
   }
 
   def exists(path: String): Future[Option[Status]] = {
-    val p = Promise[Option[Status]]
+    val p = Promise[Option[Status]]()
     zk.exists(path, watcher, ExistsHandler(p), null)
     p.future
   }
 
   def children(path: String): Future[(Seq[String], Status)] = {
-    val p = Promise[(Seq[String], Status)]
+    val p = Promise[(Seq[String], Status)]()
     zk.getChildren(path, watcher, ChildrenHandler(p), null)
     p.future
   }
 }
 
-private object StringHandler {
-  def apply(p: Promise[String]) = new AsyncCallback.StringCallback {
-    def processResult(rc: Int, path: String, context: Object, name: String) {
+private object CreateHandler {
+  def apply(p: Promise[String]) = new AsyncCallback.Create2Callback {
+    def processResult(rc: Int, path: String, context: Object, name: String, stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success name
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(name)
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -636,10 +647,10 @@ private object StringHandler {
 
 private object VoidHandler {
   def apply(p: Promise[Unit]) = new AsyncCallback.VoidCallback {
-    def processResult(rc: Int, path: String, context: Object) {
+    def processResult(rc: Int, path: String, context: Object): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (())
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(())
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -647,10 +658,10 @@ private object VoidHandler {
 
 private object DataHandler {
   def apply(p: Promise[(Array[Byte], Status)]) = new AsyncCallback.DataCallback {
-    def processResult(rc: Int, path: String, context: Object, data: Array[Byte], stat: Stat) {
+    def processResult(rc: Int, path: String, context: Object, data: Array[Byte], stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (if (data == null) Array() else data, Status(path, stat))
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(if (data == null) Array() else data, Status(path, stat))
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -658,10 +669,10 @@ private object DataHandler {
 
 private object ChildrenHandler {
   def apply(p: Promise[(Seq[String], Status)]) = new AsyncCallback.Children2Callback {
-    def processResult(rc: Int, path: String, context: Object, children: java.util.List[String], stat: Stat) {
+    def processResult(rc: Int, path: String, context: Object, children: java.util.List[String], stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (children.asScala.toList, Status(path, stat))
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(children.asScala.toList, Status(path, stat))
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -669,10 +680,10 @@ private object ChildrenHandler {
 
 private object ACLHandler {
   def apply(p: Promise[(Seq[ACL], Status)]) = new AsyncCallback.ACLCallback {
-    def processResult(rc: Int, path: String, context: Object, zacl: java.util.List[ZACL], stat: Stat) {
+    def processResult(rc: Int, path: String, context: Object, zacl: java.util.List[ZACL], stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (ACL(zacl), Status(path, stat))
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(ACL(zacl), Status(path, stat))
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -680,10 +691,10 @@ private object ACLHandler {
 
 private object StatHandler {
   def apply(p: Promise[Status]) = new AsyncCallback.StatCallback {
-    def processResult(rc: Int, path: String, context: Object, stat: Stat) {
+    def processResult(rc: Int, path: String, context: Object, stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success Status(path, stat)
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(Status(path, stat))
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -691,10 +702,10 @@ private object StatHandler {
 
 private object ExistsHandler {
   def apply(p: Promise[Option[Status]]) = new AsyncCallback.StatCallback {
-    def processResult(rc: Int, path: String, context: Object, stat: Stat) {
+    def processResult(rc: Int, path: String, context: Object, stat: Stat): Unit = {
       (Code.get(rc): @unchecked) match {
-        case Code.OK => p success (if (stat == null) None else Some(Status(path, stat)))
-        case code => p failure ZException.create(code)
+        case Code.OK => p.success(if (stat == null) None else Some(Status(path, stat)))
+        case code => p.failure(ZException.create(code))
       }
     }
   }
@@ -710,7 +721,8 @@ object Zookeeper {
    * @param config the client configuration
    * @return a client with the given `config`
    */
-  def apply(config: Configuration): Zookeeper = apply(config, null)
+  def apply(config: Configuration): Zookeeper =
+    apply(config, null)
 
   /**
    * Constructs a new ZooKeeper client using the given configuration and session credential.
@@ -720,8 +732,8 @@ object Zookeeper {
    * @return a client with the given `config` and `cred`
    */
   def apply(config: Configuration, cred: Credential): Zookeeper = {
-    val servers = ("" /: config.servers) {
-      case (buf, addr) => (if (buf.isEmpty) buf else buf + ",") + addr.getHostName + ":" + addr.getPort
+    val servers = config.servers.foldLeft("") { case (buf, addr) =>
+      (if (buf.isEmpty) buf else buf + ",") + addr.getHostName + ":" + addr.getPort
     }
     val path = (if (config.path startsWith "/") "" else "/") + config.path
     val timeout = {
@@ -744,7 +756,7 @@ object Zookeeper {
   private class ConnectionWatcher(fn: (StateEvent, Session) => Unit) extends Watcher {
     private[this] val ref = new AtomicReference[ZooKeeper]
 
-    def process(e: WatchedEvent) {
+    def process(e: WatchedEvent): Unit = {
       @tailrec def waitfor(zk: ZooKeeper): ZooKeeper = {
         if (zk == null) waitfor(ref.get()) else zk
       }
@@ -755,7 +767,7 @@ object Zookeeper {
       }
     }
 
-    def associate(zk: ZooKeeper) {
+    def associate(zk: ZooKeeper): Unit = {
       if (!ref.compareAndSet(null, zk))
         throw new AssertionError("zookeeper instance already associated")
     }
@@ -779,7 +791,8 @@ object SynchronousZookeeper {
    * @param config the client configuration
    * @return a client with the given `config`
    */
-  def apply(config: Configuration): SynchronousZookeeper = Zookeeper(config).sync
+  def apply(config: Configuration): SynchronousZookeeper =
+    Zookeeper(config).sync
 
   /**
    * Constructs a new synchronous ZooKeeper client using the given configuration and session credential.
@@ -788,7 +801,8 @@ object SynchronousZookeeper {
    * @param cred the session credentials
    * @return a client with the given `config` and `cred`
    */
-  def apply(config: Configuration, cred: Credential): SynchronousZookeeper = Zookeeper(config, cred).sync
+  def apply(config: Configuration, cred: Credential): SynchronousZookeeper =
+    Zookeeper(config, cred).sync
 }
 
 /**
@@ -808,7 +822,8 @@ object AsynchronousZookeeper {
    * @param config the client configuration
    * @return a client with the given `config`
    */
-  def apply(config: Configuration): AsynchronousZookeeper = Zookeeper(config).async
+  def apply(config: Configuration): AsynchronousZookeeper =
+    Zookeeper(config).async
 
   /**
    * Constructs a new asynchronous ZooKeeper client using the given configuration and session credential.
@@ -817,5 +832,6 @@ object AsynchronousZookeeper {
    * @param cred the session credentials
    * @return a client with the given `config` and `cred`
    */
-  def apply(config: Configuration, cred: Credential): AsynchronousZookeeper = Zookeeper(config, cred).async
+  def apply(config: Configuration, cred: Credential): AsynchronousZookeeper =
+    Zookeeper(config, cred).async
 }

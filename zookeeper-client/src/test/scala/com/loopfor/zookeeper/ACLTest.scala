@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 package com.loopfor.zookeeper
 
 import com.loopfor.zookeeper.ACL._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ACLTest extends FunSuite {
+class ACLTest extends AnyFunSuite {
   test("construction of valid ACL instances") {
     val tests = Seq(
       ("world:anyone=", WorldId, 0),
@@ -43,7 +43,7 @@ class ACLTest extends FunSuite {
       ("ip:1:2:3:4:5:6:7:8/128=*", IpId("1:2:3:4:5:6:7:8", 128), All)
     )
 
-    tests foreach { case (s, id, permission) =>
+    tests.foreach { case (s, id, permission) =>
       val acl = ACL(s)
       assert(acl.id === id)
       assert(acl.permission === permission)
@@ -59,7 +59,7 @@ class ACLTest extends FunSuite {
       "world=rw"
     )
 
-    tests foreach { s =>
+    tests.foreach { s =>
       intercept[IllegalArgumentException] { ACL(s) }
     }
   }

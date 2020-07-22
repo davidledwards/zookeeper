@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,13 +36,13 @@ class Splitter(delims: Set[Char]) {
   }
 
   @tailrec private def skip(s: Seq[Char]): Seq[Char] = s.headOption match {
-    case Some(c) if delims contains c => skip(s.tail)
+    case Some(c) if delims.contains(c) => skip(s.tail)
     case _ => s
   }
 
   private def slurp(s: Seq[Char]): (String, Seq[Char]) = {
     @tailrec def slurp(s: Seq[Char], buf: StringBuilder): (String, Seq[Char]) = s.headOption match {
-      case Some(c) if !(delims contains c) => slurp(s.tail, buf + c)
+      case Some(c) if !delims.contains(c) => slurp(s.tail, buf.append(c))
       case _ => (buf.toString, s)
     }
     slurp(s, new StringBuilder)
@@ -57,8 +57,8 @@ class Splitter(delims: Set[Char]) {
           case Some(c) if c == '"' || c == '\\' => (c, rest.tail)
           case _ => ('\\', rest)
         }
-        slurpQuote(_rest, buf + c)
-      case Some(c) => slurpQuote(s.tail, buf + c)
+        slurpQuote(_rest, buf.append(c))
+      case Some(c) => slurpQuote(s.tail, buf.append(c))
       case _ => (buf.toString, s)
     }
     slurpQuote(s, new StringBuilder)
@@ -73,7 +73,7 @@ object Splitter {
 
   def apply(delims: Set[Char]): Splitter = new Splitter(delims)
 
-  def split(s: String): Seq[String] = Default split s
+  def split(s: String): Seq[String] = Default.split(s)
 
-  def split(s: String, delims: Set[Char]): Seq[String] = Splitter(delims) split s
+  def split(s: String, delims: Set[Char]): Seq[String] = Splitter(delims).split(s)
 }

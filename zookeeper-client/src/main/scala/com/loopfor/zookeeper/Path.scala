@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 package com.loopfor.zookeeper
 
 import scala.annotation.tailrec
-import scala.collection.mutable.StringBuilder
 import scala.language._
 
 /**
@@ -165,7 +164,7 @@ object Path {
   def unapplySeq(path: Path): Option[Seq[String]] =
     if (path == null) None else Some(path.parts)
 
-  private def apply(parts: Seq[String]): Path = new Impl(parts mkString "/")
+  private def apply(parts: Seq[String]): Path = new Impl(parts.mkString("/"))
 
   private class Impl(val path: String) extends Path {
     lazy val name: String = parts.lastOption match {
@@ -180,10 +179,10 @@ object Path {
 
     lazy val parentOption: Option[Path] = {
       if (parts.size > 1) {
-        val _parts = parts dropRight 1
+        val _parts = parts.dropRight(1)
         Some(Path(_parts.last match {
           case "" => "/"
-          case _ => _parts mkString "/"
+          case _ => _parts.mkString("/")
         }))
       } else
         None
@@ -220,8 +219,8 @@ object Path {
       val stack = reduce(parse(path), List()).reverse
       Path(stack.headOption match {
         case None => ""
-        case Some("") => "/" + (stack.tail mkString "/")
-        case _ => stack mkString "/"
+        case Some("") => "/" + (stack.tail.mkString("/"))
+        case _ => stack.mkString("/")
       })
     }
 
@@ -244,13 +243,13 @@ object Path {
         case _ => path
       }
     }
-    @tailrec def collapse(path: Seq[Char], to: StringBuilder): StringBuilder = {
+    @tailrec def collapse(path: Seq[Char], to: String): String = {
       path.headOption match {
         case Some(c) => collapse(if (c == '/') munch(path.tail) else path.tail, to + c)
         case _ => to
       }
     }
-    val to = collapse(path.seq, new StringBuilder)
+    val to = collapse(path, "")
     (if (to.size > 1 && to.last == '/') to.dropRight(1) else to).toString
   }
 
@@ -258,7 +257,7 @@ object Path {
     compress(path) match {
       case "" => Seq()
       case "/" => Seq("")
-      case p => p split '/'
+      case p => p.split('/').to(Seq)
     }
   }
 }

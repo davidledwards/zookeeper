@@ -2,20 +2,14 @@
 
 A new command line program designed to replace `zkCli.sh`, which comes with the ZooKeeper distribution. This program is much cleaner and easier to use.
 
-## Installing the CLI
+## Installing
 
-A local build will install an assembly of the CLI in your local Ivy repository, complete with all requisite dependencies. The only exception is Java 1.8, which must be separately installed on the target machine. The Scala runtime is included in the assembly, so there is no need for explicit installation.
+The CLI program can be downloaded from the Sonatype Repository in both [tar](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.5/tar.gz) and [zip](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.5/zip) formats.
 
-The location of the assembly is `~/.ivy2/local/com.loopfor.zookeeper/zookeeper-cli/1.4.1/tars/`.
-
-* `zookeeper-cli.tar.gz`
-
-Alternatively, these artifacts can be downloaded from the [Sonatype Repository](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.4.1/tar.gz).
-
-Unpacking this assembly will produce the following output:
+Unpacking the assembly will produce the following output:
 
 ```shell
-zookeeper-cli-1.4.1/
+zookeeper-cli-1.5/
 + bin/
   + zk
   + zk.bat
@@ -24,7 +18,7 @@ zookeeper-cli-1.4.1/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.4.1/bin/zk` in your PATH or create an alias.
+For convenience, you might place `zookeeper-cli-1.5/bin/zk` in your `PATH` or create an alias.
 
 ## Helpful Tips
 
@@ -338,6 +332,12 @@ Create node `bar` with data `hello world` encoded as `UTF-16`.
 zk> mk -e utf-16 "hello world"
 ```
 
+Create node `foo` with time-to-live of `10` seconds.
+
+```shell
+zk> mk -T 10000 foo
+```
+
 ### Modifying nodes
 
 Set data of node `/foo/bar` as `goodbye world` whose current version in ZooKeeper is `19`.
@@ -461,7 +461,7 @@ zk> quit
 
 ## License
 
-Copyright 2019 David Edwards
+Copyright 2020 David Edwards
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

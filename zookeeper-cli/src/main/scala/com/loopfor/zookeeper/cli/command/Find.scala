@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,8 @@ object Find {
       --encoding, -e
       --sequential, -S
       --ephemeral, -E
+      --ttl, -T
+      --container, -C
       --acl, -A
 
     set [OPTIONS] [DATA]
@@ -121,11 +123,11 @@ options:
       val (path, afterPath) = pathArg(afterPattern)
       val exec = execArg(afterPath)
 
-      val base = Node(context resolve path)
+      val base = Node(context.resolve(path))
       val found = if (recurse) {
         def find(node: Node, found: Seq[Node]): Seq[Node] = {
           try {
-            (found /: node.children()) { case (f, c) => c.name match {
+            node.children().foldLeft(found) { case (f, c) => c.name match {
               case pattern(_*) => find(c, f :+ c)
               case _ => find(c, f)
             }}
@@ -135,7 +137,7 @@ options:
         }
         find(base, Seq.empty)
       } else {
-        base.children() filter { c => c.name match {
+        base.children().filter { c => c.name match {
           case pattern(_*) => true
           case _ => false
         }}
@@ -167,7 +169,7 @@ options:
 
       def noop(node: Node) = true
 
-      (execute _ /: found) { case (op, node) =>
+      found.foldLeft(execute _) { case (op, node) =>
         if (op(node)) op else noop _
       }
       context

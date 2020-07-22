@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ options:
       val optr = opts <~ args
       val recurse = optr[Boolean]("recursive")
       val format = optr[FormatFunction]("long")
-      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
+      val nodes = pathArgs(optr).map { path => Node(context.resolve(path)) }
       list(nodes, recurse, format)
       context
     }
@@ -68,14 +68,14 @@ options:
 
   private def list(nodes: Seq[Node], recurse: Boolean, format: FormatFunction): Unit = {
     val count = nodes.size
-    (1 /: nodes) { case (i, node) =>
+    nodes.foldLeft(1) { case (i, node) =>
       try {
-        val children = node.children() sortBy { _.name }
+        val children = node.children().sortBy { _.name }
         if (count > 1) println(s"${node.path}:")
         if (recurse)
           traverse(children, 0, format)
         else
-          children foreach { child => println(format(child, 0)) }
+          children.foreach { child => println(format(child, 0)) }
         if (count > 1 && i < count) println()
       } catch {
         case _: NoNodeException => println(s"${node.path}: no such node")
@@ -86,7 +86,7 @@ options:
 
   private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
-    case paths => paths map { Path(_) }
+    case paths => paths.map { Path(_) }
   }
 
   private def formatShort(node: Node, depth: Int): String = {
@@ -103,15 +103,15 @@ options:
   }
 
   private def indent(depth: Int) = {
-    def pad(depth: Int) = " " * ((depth - 1) * 2)
+    def pad(depth: Int) = " ".repeat((depth - 1) * 2)
     if (depth > 0) pad(depth) + "+ " else ""
   }
 
-  private def traverse(children: Seq[Node], depth: Int, format: (Node, Int) => String) {
+  private def traverse(children: Seq[Node], depth: Int, format: (Node, Int) => String): Unit = {
     children foreach { child =>
       println(format(child, depth))
       try {
-        traverse(child.children() sortBy { _.name }, depth + 1, format)
+        traverse(child.children().sortBy { _.name }, depth + 1, format)
       } catch {
         case _: NoNodeException =>
       }

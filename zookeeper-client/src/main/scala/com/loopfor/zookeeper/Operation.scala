@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,12 @@ sealed trait Operation {
  * @param disp the disposition of the node
  */
 case class CreateOperation(path: String, data: Array[Byte], acl: Seq[ACL], disp: Disposition) extends Operation {
-  private[zookeeper] val op: Op = Op.create(path, data, ACL.toZACL(acl), disp.mode.toFlag)
+  private[zookeeper] val op: Op = disp match {
+    case TimeToLive(ttl) =>
+      Op.create(path, data, ACL.toZACL(acl), disp.mode.toFlag, ttl.toMillis)
+    case _ =>
+      Op.create(path, data, ACL.toZACL(acl), disp.mode.toFlag)
+  }
 }
 
 /**
@@ -49,7 +54,7 @@ case class CreateOperation(path: String, data: Array[Byte], acl: Seq[ACL], disp:
  * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
 case class DeleteOperation(path: String, version: Option[Int]) extends Operation {
-  private[zookeeper] val op: Op = Op.delete(path, version getOrElse -1)
+  private[zookeeper] val op: Op = Op.delete(path, version.getOrElse(-1))
 }
 
 /**
@@ -59,7 +64,7 @@ case class DeleteOperation(path: String, version: Option[Int]) extends Operation
  * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
 case class CheckOperation(path: String, version: Option[Int]) extends Operation {
-  private[zookeeper] val op: Op = Op.check(path, version getOrElse -1)
+  private[zookeeper] val op: Op = Op.check(path, version.getOrElse(-1))
 }
 
 /**
@@ -70,7 +75,7 @@ case class CheckOperation(path: String, version: Option[Int]) extends Operation 
  * @param version a `Some` containing the expected version of the node or `None` if a version match is not required
  */
 case class SetOperation(path: String, data: Array[Byte], version: Option[Int]) extends Operation {
-  private[zookeeper] val op: Op = Op.setData(path, data, version getOrElse -1)
+  private[zookeeper] val op: Op = Op.setData(path, data, version.getOrElse(-1))
 }
 
 /**
@@ -90,7 +95,7 @@ sealed trait Result {
  * 
  * @param op the create operation corresponding to this result
  * @param path the final path of the created node, which will differ from the path in `op` if either [[PersistentSequential]]
- * or [[EphemeralSequential]] disposition is specified
+ * [[PersistentSequentialTimeToLive]] or [[EphemeralSequential]] disposition is specified
  */
 case class CreateResult(op: CreateOperation, path: String) extends Result
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ object GetACL {
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       val optr = opts <~ args
-      val nodes = optr.args map { path => Node(context resolve path) }
+      val nodes = optr.args.map { path => Node(context.resolve(path)) }
       getACL(nodes)
       context
     }
@@ -49,7 +49,7 @@ object GetACL {
 
   private def getACL(nodes: Seq[Node]): Unit = {
     val count = nodes.size
-    (1 /: nodes) { case (i, node) =>
+    nodes.foldLeft(1) { case (i, node) =>
       try {
         val (acl, _) = node.getACL()
         if (count > 1) println(s"${node.path}:")

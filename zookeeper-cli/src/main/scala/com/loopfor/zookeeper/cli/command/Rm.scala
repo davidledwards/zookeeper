@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ options:
       val recurse = optr[Boolean]("recursive")
       val version = versionOpt(optr)
       val path = pathArg(optr)
-      val node = Node(context resolve path)
+      val node = Node(context.resolve(path))
       delete(node, recurse, version)
       context
     }
@@ -86,15 +86,15 @@ options:
       if (node.path.path == "/") complain("/: recursive deletion of root path not allowed")
       def traverse(node: Node, deletions: Seq[Node]): Seq[Node] = {
         try {
-          ((node +: deletions) /: node.children()) { case (d, child) => traverse(child, d) }
+          node.children().foldLeft(node +: deletions) { case (d, child) => traverse(child, d) }
         } catch {
           case _: NoNodeException => deletions
         }
       }
-      traverse(node, Seq.empty) map { (_, Option.empty[Int]) }
+      traverse(node, Seq.empty).map { (_, Option.empty[Int]) }
     } else
       Seq((node, version))
-    deletions foreach { case (node, version) =>
+    deletions.foreach { case (node, version) =>
       try {
         node.delete(version)
       } catch {

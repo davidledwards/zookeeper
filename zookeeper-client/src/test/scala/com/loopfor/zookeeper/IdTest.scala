@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
  */
 package com.loopfor.zookeeper
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class IdTest extends FunSuite {
+class IdTest extends AnyFunSuite {
   test("construction of valid Id instances") {
     val tests = Seq(
       ("world:anyone", "world", "anyone"),
@@ -36,7 +36,7 @@ class IdTest extends FunSuite {
       ("ip:1:2:3:4:5:6:7:8/128", "ip", "1:2:3:4:5:6:7:8/128")
     )
 
-    tests foreach { case (s, scheme, id) =>
+    tests.foreach { case (s, scheme, id) =>
       val i = Id(s)
       assert(i.scheme === scheme)
       assert(i.id === id)
@@ -69,7 +69,7 @@ class IdTest extends FunSuite {
       "bad"
     )
 
-    tests foreach { s =>
+    tests.foreach { s =>
       intercept[IllegalArgumentException] { Id(s) }
     }
   }

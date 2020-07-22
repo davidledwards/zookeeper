@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,18 @@
  */
 package com.loopfor.zookeeper.cli
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scala.language._
 
-class SplitterTest extends FunSuite {
+class SplitterTest extends AnyFunSuite {
   test("arguments without quotes") {
     val tests = Seq(
           ("foo", Seq("foo")),
           ("foo bar", Seq("foo", "bar")),
           ("foo bar --this -x --that --", Seq("foo", "bar", "--this", "-x", "--that", "--")))
 
-    tests foreach { case (s, args) =>
-      val _args = Splitter split s
+    tests.foreach { case (s, args) =>
+      val _args = Splitter.split(s)
       assert(_args === args)
     }
   }
@@ -40,8 +40,8 @@ class SplitterTest extends FunSuite {
       ("""this "foo and bar" that\""", Seq("this", "foo and bar", """that\"""))
     )
 
-    tests foreach { case (s, args) =>
-      val _args = Splitter split s
+    tests.foreach { case (s, args) =>
+      val _args = Splitter.split(s)
       assert(_args === args)
     }
   }

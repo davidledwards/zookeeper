@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,14 +57,14 @@ abstract class BaseId(val scheme: String, val id: String) extends Id {
 /**
  * An identity whose [[scheme]] is `"world"` and [[id]] is `"anyone"`.
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 case object WorldId extends BaseId("world", "anyone")
 
 /**
  * An identity whose [[scheme]] is `"auth"` and [[id]] is `""`.
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 case object AuthId extends BaseId("auth", "")
 
@@ -74,7 +74,7 @@ case object AuthId extends BaseId("auth", "")
  * @param username a username, which may be empty
  * @param password a cleartext password, which may be empty
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 case class DigestId(username: String, password: String) extends BaseId("digest", username + ":" + password)
 
@@ -83,7 +83,7 @@ case class DigestId(username: String, password: String) extends BaseId("digest",
  *
  * @param domain an internet domain name
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 case class HostId(domain: String) extends BaseId("host", domain)
 
@@ -93,7 +93,7 @@ case class HostId(domain: String) extends BaseId("host", domain)
  * @param addr an IPv4 or IPv6 address in dotted decimal form
  * @param prefix the network prefix in bits, a range of [`0`,`32`] for IPv4 and [`0`,`128`] for IPv6
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 case class IpId(addr: String, prefix: Int) extends BaseId("ip", addr + "/" + prefix)
 
@@ -118,7 +118,7 @@ case class IpId(addr: String, prefix: Int) extends BaseId("ip", addr + "/" + pre
  *  - `"''addr''"` where prefix is assumed to be `32` and `128` for IPv4 and IPv6, respectively.
  *  - `"''addr''/''prefix''"` where prefix is in the range `[0,32]` and `[0,128]` for IPv4 and IPv6, respectively.
  *
- * @see [[http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
+ * @see [[https://zookeeper.apache.org/doc/r3.5.6/zookeeperProgrammers.html#sc_BuiltinACLSchemes Schemes]]
  */
 object Id {
   /**
@@ -188,7 +188,9 @@ object Id {
    * containing the offending exception
    */
   def parse(s: String): Try[Id] = Try {
-    def error(message: String): Nothing = throw new IllegalArgumentException(s"${s}: ${message}")
+    def error(message: String): Nothing =
+      throw new IllegalArgumentException(s"${s}: ${message}")
+  
     s.split(":", 2) match {
       case Array("world", id) =>
         if (id == "anyone") WorldId

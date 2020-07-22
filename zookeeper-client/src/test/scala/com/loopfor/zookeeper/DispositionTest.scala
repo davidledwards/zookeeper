@@ -13,8 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.loopfor.zookeeper.cli
+package com.loopfor.zookeeper
 
-object Version {
-  val CLI = "1.5"
+import com.loopfor.zookeeper.ACL._
+import org.scalatest.funsuite.AnyFunSuite
+import scala.concurrent.duration._
+
+class DispositionTest extends AnyFunSuite {
+  test("conditional dispositions with TTL values") {
+    val tests = Seq(
+      (PersistentTimeToLive(Duration.Zero), 0L),
+      (PersistentTimeToLive(1.second), 1000L),
+      (PersistentSequentialTimeToLive(Duration.Zero), 0L),
+      (PersistentSequentialTimeToLive(1.second), 1000L)
+    )
+
+    tests.foreach { case (disp, millis) =>
+      assert(disp.ttl.toMillis === millis)
+    }
+  }
 }

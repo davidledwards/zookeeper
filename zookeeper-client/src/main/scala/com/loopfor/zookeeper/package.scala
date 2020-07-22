@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,21 +30,28 @@ package object zookeeper {
   type BadVersionException = KeeperException.BadVersionException
   type ConnectionLossException = KeeperException.ConnectionLossException
   type DataInconsistencyException = KeeperException.DataInconsistencyException
+  type EphemeralOnLocalSessionException = KeeperException.EphemeralOnLocalSessionException
   type InvalidACLException = KeeperException.InvalidACLException
   type InvalidCallbackException = KeeperException.InvalidCallbackException
   type MarshallingErrorException = KeeperException.MarshallingErrorException
+  type NewConfigNoQuorum = KeeperException.NewConfigNoQuorum
   type NoAuthException = KeeperException.NoAuthException
   type NoChildrenForEphemeralsException = KeeperException.NoChildrenForEphemeralsException
   type NodeExistsException = KeeperException.NodeExistsException
   type NoNodeException = KeeperException.NoNodeException
   type NotEmptyException = KeeperException.NotEmptyException
   type NotReadOnlyException = KeeperException.NotReadOnlyException
+  type NoWatcherException = KeeperException.NoWatcherException
   type OperationTimeoutException = KeeperException.OperationTimeoutException
+  type ReconfigDisabledException = KeeperException.ReconfigDisabledException
+  type ReconfigInProgress = KeeperException.ReconfigInProgress
+  type RequestTimeoutException = KeeperException.RequestTimeoutException
   type RuntimeInconsistencyException = KeeperException.RuntimeInconsistencyException
   type SessionExpiredException = KeeperException.SessionExpiredException
   type SessionMovedException = KeeperException.SessionMovedException
   type SystemErrorException = KeeperException.SystemErrorException
   type UnimplementedException = KeeperException.UnimplementedException
+  type UnknownSessionException = KeeperException.UnknownSessionException
 
   /**
    * Converts the tuple (''host'',''port'') to an Internet socket address.

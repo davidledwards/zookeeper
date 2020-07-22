@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ options:
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       val optr = opts <~ args
       val format = optr[FormatFunction]("compact")
-      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
+      val nodes = pathArgs(optr).map { path => Node(context.resolve(path)) }
       stat(nodes, format)
       context
     }
@@ -62,7 +62,7 @@ options:
 
   private def stat(nodes: Seq[Node], format: FormatFunction): Unit = {
     val count = nodes.size
-    (1 /: nodes) { case (i, node) =>
+    nodes.foldLeft(1) { case (i, node) =>
       node.exists() match {
         case Some(status) =>
           if (count > 1) println(s"${node.path}:")
@@ -76,26 +76,26 @@ options:
 
   private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
-    case paths => paths map { Path(_) }
+    case paths => paths.map { Path(_) }
   }
 
   private def formatLong(status: Status): String = {
-    "czxid: " + status.czxid + "\n" +
-    "mzxid: " + status.mzxid + "\n" +
-    "pzxid: " + status.pzxid + "\n" +
-    "ctime: " + status.ctime + " (" + dateFormat.format(new Date(status.ctime)) + ")\n" +
-    "mtime: " + status.mtime + " (" + dateFormat.format(new Date(status.mtime)) + ")\n" +
-    "version: " + status.version + "\n" +
-    "cversion: " + status.cversion + "\n" +
-    "aversion: " + status.aversion + "\n" +
-    "owner: " + status.ephemeralOwner + "\n" +
-    "datalen: " + status.dataLength + "\n" +
-    "children: " + status.numChildren
+    s"czxid: ${status.czxid}\n" +
+    s"mzxid: ${status.mzxid}\n" +
+    s"pzxid: ${status.pzxid}\n" +
+    s"ctime: ${status.ctime} (${dateFormat.format(new Date(status.ctime))})\n" +
+    s"mtime: ${status.mtime} (${dateFormat.format(new Date(status.mtime))})\n" +
+    s"version: ${status.version}\n" +
+    s"cversion: ${status.cversion}\n" +
+    s"aversion: ${status.aversion}\n" +
+    s"owner: ${status.ephemeralOwner}\n" +
+    s"datalen: ${status.dataLength}\n" +
+    s"children: ${status.numChildren}"
   }
 
   private def formatCompact(status: Status): String = {
-    status.czxid + " " + status.mzxid + " " + status.pzxid + " " + dateFormat.format(new Date(status.ctime)) + " " +
-      dateFormat.format(new Date(status.mtime)) + " " + status.version + " " + status.cversion + " " +
-      status.aversion + " " + status.ephemeralOwner + " " + status.dataLength + " " + status.numChildren
+    s"${status.czxid} ${status.mzxid} ${status.pzxid} ${dateFormat.format(new Date(status.ctime))} " +
+      s"${dateFormat.format(new Date(status.mtime))} ${status.version} ${status.cversion} " +
+      s"${status.aversion} ${status.ephemeralOwner} ${status.dataLength} ${status.numChildren}"
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ options:
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       val optr = opts <~ args
       val display = displayOpt(optr)
-      val nodes = pathArgs(optr) map { path => Node(context resolve path) }
+      val nodes = pathArgs(optr).map { path => Node(context.resolve(path)) }
       get(nodes, display)
       context
     }
@@ -73,7 +73,7 @@ options:
 
   private def get(nodes: Seq[Node], display: DisplayFunction): Unit = {
     val count = nodes.size
-    (1 /: nodes) { case (i, node) =>
+    nodes.foldLeft(1) { case (i, node) =>
       try {
         val (data, _) = node.get()
         if (count > 1) println(s"${node.path}:")
@@ -95,19 +95,18 @@ options:
 
   private def pathArgs(optr: OptResult): Seq[Path] = optr.args match {
     case Seq() => Seq(Path(""))
-    case paths => paths map { Path(_) }
+    case paths => paths.map { Path(_) }
   }
 
-  private def displayHex(data: Array[Byte]) {
-    @tailrec def display(n: Int) {
-      def charOf(b: Byte) = if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.'
-
-      def pad(n: Int) = " " * n
+  private def displayHex(data: Array[Byte]): Unit = {
+    @tailrec def display(n: Int): Unit = {
+      def charOf(b: Byte) = { if (b >= 32 && b < 127) b.asInstanceOf[Char] else '.' }
+      def pad(n: Int) = { " ".repeat(n) }
 
       if (n < data.length) {
         val l = Math.min(n + 16, data.length) - n
-        print("%08x  " format n)
-        print((for (i <- n until (n + l)) yield "%02x " format data(i)).mkString)
+        print("%08x  ".format(n))
+        print((for (i <- n until (n + l)) yield "%02x ".format(data(i)).mkString))
         print(pad((16 - l) * 3))
         print(" |")
         print((for (i <- n until (n + l)) yield charOf(data(i))).mkString)

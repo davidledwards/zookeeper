@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,11 @@ case object Authenticated extends StateEvent
  */
 case object Expired extends StateEvent
 
+/**
+ * An event indicating that the client has closed its session with ZooKeeper.
+ */
+case object Closed extends StateEvent
+
 private[zookeeper] object StateEvent {
   private val events = Map(
         KeeperState.Disconnected.getIntValue -> Disconnected,
@@ -67,7 +72,8 @@ private[zookeeper] object StateEvent {
         KeeperState.AuthFailed.getIntValue -> AuthenticationFailed,
         KeeperState.ConnectedReadOnly.getIntValue -> ConnectedReadOnly,
         KeeperState.SaslAuthenticated.getIntValue -> Authenticated,
-        KeeperState.Expired.getIntValue -> Expired
+        KeeperState.Expired.getIntValue -> Expired,
+        KeeperState.Closed.getIntValue -> Closed
         )
 
   def apply(state: KeeperState): StateEvent = apply(state.getIntValue)
@@ -114,12 +120,24 @@ case class DataChanged(path: String) extends NodeEvent
  */
 case class ChildrenChanged(path: String) extends NodeEvent
 
+/**
+ * An event indicating that a child watch was removed.
+ */
+case class ChildWatchRemoved(path: String) extends NodeEvent
+
+/**
+ * An event indicating that a data watch was removed.
+ */
+case class DataWatchRemoved(path: String) extends NodeEvent
+
 private[zookeeper] object NodeEvent {
   private val events = Map[Int, String => NodeEvent](
         EventType.NodeCreated.getIntValue -> { p => new Created(p) },
         EventType.NodeDeleted.getIntValue -> { p => new Deleted(p) },
         EventType.NodeDataChanged.getIntValue -> { p => new DataChanged(p) },
-        EventType.NodeChildrenChanged.getIntValue -> { p => new ChildrenChanged(p) }
+        EventType.NodeChildrenChanged.getIntValue -> { p => new ChildrenChanged(p) },
+        EventType.ChildWatchRemoved.getIntValue -> { p => new ChildWatchRemoved(p) },
+        EventType.DataWatchRemoved.getIntValue -> { p => new DataWatchRemoved(p) }
         )
 
   def apply(event: EventType, path: String): NodeEvent = apply(event.getIntValue, path)

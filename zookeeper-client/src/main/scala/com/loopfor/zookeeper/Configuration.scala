@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ object Configuration {
    * @param servers sequence of socket addresses corresponding to server endpoints
    * @return a default configuration with the given `servers`
    */
-  def apply(servers: Seq[InetSocketAddress]): Configuration = new Builder(servers) build
+  def apply(servers: Seq[InetSocketAddress]): Configuration = new Builder(servers).build()
 
   /**
    * Used in pattern matching to deconstruct a configuration.
@@ -138,11 +138,11 @@ object Configuration {
         watcher: (StateEvent, Session) => Unit,
         allowReadOnly: Boolean,
         exec: ExecutionContext) {
-    private[Configuration] def this(servers: Seq[InetSocketAddress]) {
-      this(servers, "", 60 seconds, null, false, null)
+    private[Configuration] def this(servers: Seq[InetSocketAddress]) = {
+      this(servers, "", 60.seconds, null, false, null)
     }
 
-    private[Configuration] def this(config: Configuration) {
+    private[Configuration] def this(config: Configuration) = {
       this(config.servers, config.path, config.timeout, config.watcher, config.allowReadOnly, config.exec)
     }
 
@@ -165,5 +165,5 @@ object Configuration {
   }
 
   implicit def configToBuilder(config: Configuration): Builder = new Builder(config)
-  implicit def builderToConfig(builder: Builder): Configuration = builder.build
+  implicit def builderToConfig(builder: Builder): Configuration = builder.build()
 }

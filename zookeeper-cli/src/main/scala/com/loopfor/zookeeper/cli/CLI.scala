@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 import scala.language._
 
 object CLI {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     import Console.err
     val status = try run(args) catch {
       case e: OptException =>
@@ -85,7 +85,7 @@ options:
       println(Usage)
       0
     } else {
-      val optr = opts <~ args
+      val optr = opts <~ args.to(Seq)
       if (optr[Boolean]("version")) {
         println(s"zk ${Version.CLI}")
         0
@@ -116,16 +116,16 @@ options:
                 "nolog.properties"
             }
             LogManager.resetConfiguration()
-            PropertyConfigurator configure Thread.currentThread.getContextClassLoader.getResource(rc)
+            PropertyConfigurator.configure(Thread.currentThread.getContextClassLoader.getResource(rc))
 
             if (verbose) {
-              val hosts = (servers map { s => s"${s.getHostName}:${s.getPort}" }) mkString ","
+              val hosts = (servers.map { s => s"${s.getHostName}:${s.getPort}" }).mkString(",")
               println(s"connecting to {${hosts}} @ ${if (path == "") "/" else path} ...")
             }
 
             val state = new AtomicReference[StateEvent](Disconnected)
-            val config = Configuration(servers) withPath(path) withTimeout(timeout) withAllowReadOnly(readonly) withWatcher {
-              (event, session) => state set event
+            val config = Configuration(servers).withPath(path).withTimeout(timeout).withAllowReadOnly(readonly).withWatcher {
+              (event, session) => state.set(event)
             }
             val zk = try Zookeeper(config) catch {
               case e: IOException => CLIException(s"I/O error: ${e.getMessage}")
@@ -151,12 +151,12 @@ options:
                   "quit" -> Quit.command(zk),
                   "exit" -> Quit.command(zk),
                   "help" -> Help.command(),
-                  "?" -> Help.command()) withDefaultValue new CommandProcessor {
+                  "?" -> Help.command()).withDefaultValue(new CommandProcessor {
                     def apply(cmd: String, args: Seq[String], context: Path): Path = {
                       println(s"$cmd: no such command")
                       context
                     }
-                  }
+                  })
 
             def execute(args: Seq[String], context: Path): Option[Path] = {
               if (args.size > 0) {
@@ -188,7 +188,7 @@ options:
               case Some(cmds) =>
                 @tailrec def process(cmds: Seq[String], context: Path): Int = cmds match {
                   case Seq(cmd, next @ _*) =>
-                    val args = Splitter split cmd
+                    val args = Splitter.split(cmd)
                     execute(args, context) match {
                       case Some(c) => if (c == null) 0 else process(next, c)
                       case None => 1
@@ -223,7 +223,7 @@ options:
     ("file", 'f') ~> as[Option[String]] ~~ None ::
     ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
     ("quiet", 'q') ~> just(true) ~~ false ::
-    "log" ~> as[File] ~~ new File(System getProperty "user.home", "zk.log") ::
+    "log" ~> as[File] ~~ new File(System.getProperty("user.home"), "zk.log") ::
     "level" ~> as[Level] ~~ Level.WARN ::
     "nolog" ~> just(true) ~~ false ::
     Nil
@@ -277,19 +277,19 @@ options:
       (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'
     }
     def validated(host: String) = {
-      if (host forall { isHostChar _ }) host
+      if (host.forall { isHostChar _ }) host
       else throw CLIException(s"$host: invalid host name")
     }
     optr.args match {
       case Nil => CLIException("no servers specified")
-      case params => params map { server =>
-        val i = server indexOf ':'
+      case params => params.map { server =>
+        val i = server.indexOf(':')
         val (host, port) =
           if (i == -1) (server, DefaultPort)
           else if (i == 0) CLIException(s"$server: missing host; expecting `host[:port]`")
           else
-            (server take i,
-              server drop i + 1 match {
+            (server.take(i),
+              server.drop(i + 1) match {
                 case "" => DefaultPort
                 case p => try p.toInt catch {
                   case _: NumberFormatException => CLIException(s"$server: port invalid; expecting `host[:port]`")

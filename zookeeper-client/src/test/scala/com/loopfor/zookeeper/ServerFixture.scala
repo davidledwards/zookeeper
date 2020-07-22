@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@ import java.util.UUID
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 
 object ServerFixture {
-  private val TMP_PATH = System getProperty "java.io.tmpdir"
+  private val TMP_PATH = System.getProperty("java.io.tmpdir")
   private val TICK_TIME = ZooKeeperServer.DEFAULT_TICK_TIME
   private val MAX_CONNECTIONS = 64
 
   def apply(): ZooKeeperServer = {
+    System.setProperty("zookeeper.extendedTypesEnabled", "true")
     val dir = new File(TMP_PATH, "zk-" + UUID.randomUUID())
     val server = new ZooKeeperServer(dir, dir, TICK_TIME)
     val con = new NIOServerCnxnFactory

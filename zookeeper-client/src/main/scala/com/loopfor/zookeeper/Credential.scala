@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ object Credential {
         if (a == null)
           "null"
         else
-          ("" /: a) {
+          a.foldLeft("") {
             case (buf, b) if buf.isEmpty => "[" + hex(b)
             case (buf, b) => buf + " " + hex(b)
           } + "]"
@@ -69,7 +69,7 @@ object Credential {
 
       private[this] def hex(b: Byte): String = {
         def hexChar(c: Int) = {
-          (if (c < 10) '0' + c else 'a' + (c - 10)) toChar
+          (if (c < 10) '0' + c else 'a' + (c - 10)).toChar
         }
         hexChar((b >>> 4) & 0x0f).toString + hexChar(b & 0x0f)
       }

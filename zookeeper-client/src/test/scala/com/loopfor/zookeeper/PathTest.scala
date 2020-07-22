@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
  */
 package com.loopfor.zookeeper
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import scala.language._
 
-class PathTest extends FunSuite {
+class PathTest extends AnyFunSuite {
   test("path compression") {
     val tests = Seq(
           ("", ""),
@@ -30,8 +30,8 @@ class PathTest extends FunSuite {
           ("//foo/bar", "/foo/bar"),
           ("foo//bar//", "foo/bar"))
 
-    tests foreach {
-      case (p, e) => assert(Path(p).path === e)
+    tests.foreach { case (p, e) =>
+      assert(Path(p).path === e)
     }
   }
 
@@ -42,8 +42,8 @@ class PathTest extends FunSuite {
           ("foo/bar", Seq("foo", "bar")),
           ("/foo/bar", Seq("", "foo", "bar")))
 
-    tests foreach {
-      case (p, e) => assert(Path(p).parts === e)
+    tests.foreach { case (p, e) =>
+      assert(Path(p).parts === e)
     }
   }
 
@@ -67,8 +67,8 @@ class PathTest extends FunSuite {
           ("/foo/../..", "/"),
           ("/foo/../../bar", "/bar"))
 
-    tests foreach {
-      case (p, e) => assert(Path(p).normalize.path === e)
+    tests.foreach { case (p, e) =>
+      assert(Path(p).normalize.path === e)
     }
   }
 
@@ -85,8 +85,8 @@ class PathTest extends FunSuite {
           ("/foo", "bar", "/foo/bar"),
           ("/foo", "/bar", "/bar"))
 
-    tests foreach {
-      case (l, r, e) => assert(Path(l).resolve(r).path === e)
+    tests.foreach { case (l, r, e) =>
+      assert(Path(l).resolve(r).path === e)
     }
   }
 
@@ -103,8 +103,8 @@ class PathTest extends FunSuite {
           ("/foo", "bar", "/foo/bar"),
           ("/foo", "/bar", "/bar"))
 
-    tests foreach {
-      case (l, r, e) => assert((Path(l).resolve(r)).path === e)
+    tests.foreach { case (l, r, e) =>
+      assert((Path(l).resolve(r)).path === e)
     }
   }
 
@@ -115,8 +115,8 @@ class PathTest extends FunSuite {
           ("foo", false),
           ("/foo", true))
 
-    tests foreach {
-      case (p, e) => assert(Path(p).isAbsolute === e)
+    tests.foreach { case (p, e) =>
+      assert(Path(p).isAbsolute === e)
     }
   }
 
@@ -126,14 +126,14 @@ class PathTest extends FunSuite {
           ("/foo", "/"),
           ("/foo/bar", "/foo"))
 
-    testsOk foreach {
-      case (p, e) => assert(Path(p).parent.path === e)
+    testsOk.foreach { case (p, e) =>
+      assert(Path(p).parent.path === e)
     }
 
     val testsError = Seq("", "/", "foo")
 
-    testsError foreach {
-      case (p) => intercept[NoSuchElementException] { Path(p).parent }
+    testsError.foreach { case (p) =>
+      intercept[NoSuchElementException] { Path(p).parent }
     }
   }
 
@@ -143,14 +143,14 @@ class PathTest extends FunSuite {
           ("/foo", "/"),
           ("/foo/bar", "/foo"))
 
-    testsOk foreach {
-      case (p, e) => assert(Path(p).parentOption.get.path === e)
+    testsOk.foreach { case (p, e) =>
+      assert(Path(p).parentOption.get.path === e)
     }
 
     val testsError = Seq("", "/", "foo")
 
-    testsError foreach {
-      case (p) => assert(Path(p).parentOption === None)
+    testsError.foreach { case (p) =>
+      assert(Path(p).parentOption === None)
     }
   }
 
@@ -161,8 +161,8 @@ class PathTest extends FunSuite {
           ("foo/bar", Seq("foo", "bar")),
           ("/foo/bar", Seq("", "foo", "bar")))
 
-    tests foreach {
-      case (p, e) => Path(p) match {
+    tests.foreach { case (p, e) =>
+      Path(p) match {
         case Path(parts @ _*) => assert(parts === e)
       }
     }

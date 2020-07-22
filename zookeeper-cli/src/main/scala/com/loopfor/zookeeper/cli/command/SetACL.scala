@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 David Edwards
+ * Copyright 2020 David Edwards
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ options:
       val version = versionOpt(optr)
       val (path, afterPath) = pathArg(optr)
       val acl = aclArgs(afterPath)
-      val node = Node(context resolve path)
+      val node = Node(context.resolve(path))
       setACL(node, version, action, acl)
       context
     }
@@ -114,9 +114,9 @@ options:
       case _: NoNodeException => complain(s"${node.path}: no such node")
     }
     val newACL = action match {
-      case 'add => (toMap(curACL) /: acl) { case (c, a) => c + (a.id -> a) }.values.toSeq
-      case 'remove => (toMap(curACL) /: acl) { case (c, a) => c - a.id }.values.toSeq
-      case 'set => acl
+      case Symbol("add") => acl.foldLeft(toMap(curACL)) { case (c, a) => c + (a.id -> a) }.values.toSeq
+      case Symbol("remove") => acl.foldLeft(toMap(curACL)) { case (c, a) => c - a.id }.values.toSeq
+      case Symbol("set") => acl
     }
     newACL match {
       case Seq() => complain("new ACL would be empty")
@@ -130,10 +130,10 @@ options:
   }
 
   private def actionOpt(optr: OptResult): Symbol = {
-    if (optr[Boolean]("set")) 'set
-    else if (optr[Boolean]("add")) 'add
-    else if (optr[Boolean]("remove")) 'remove
-    else 'set
+    if (optr[Boolean]("set")) Symbol("set")
+    else if (optr[Boolean]("add")) Symbol("add")
+    else if (optr[Boolean]("remove")) Symbol("remove")
+    else Symbol("set")
   }
 
   private def versionOpt(optr: OptResult): Option[Int] = {
@@ -152,7 +152,7 @@ options:
 
   private def aclArgs(args: Seq[String]): Seq[ACL] = args match {
     case Seq() => complain("ACL must be specified")
-    case _ => args map { acl =>
+    case _ => args.map { acl =>
       ACL.parse(acl) match {
         case Success(a) => a
         case Failure(e) => complain(e.getMessage)
@@ -161,6 +161,6 @@ options:
   }
 
   private def toMap(acl: Seq[ACL]): Map[Id, ACL] = {
-    (Map.empty[Id, ACL] /: acl) { case (m, a) => m + (a.id -> a) }
+    acl.foldLeft(Map.empty[Id, ACL]) { case (m, a) => m + (a.id -> a) }
   }
 }
