@@ -1,1 +1,2 @@
-This GitHub Pages site is best viewed at <http://www.loopfor.com/zookeeper/>.
+This GitHub Pages site is best viewed at <https://davidedwards.io/zookeeper/>.
+
