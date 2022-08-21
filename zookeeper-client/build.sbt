@@ -27,7 +27,7 @@ lazy val compilerSettings = Seq(
 lazy val dependencySettings = Seq(
   libraryDependencies ++= Seq(
     // Compile
-    "org.apache.zookeeper" % "zookeeper" % "3.6.1" exclude("jline", "jline"),
+    "org.apache.zookeeper" % "zookeeper" % "3.8.0" exclude("jline", "jline"),
 
     // Test
     "org.scalatest" %% "scalatest" % "3.2.13" % "test",
