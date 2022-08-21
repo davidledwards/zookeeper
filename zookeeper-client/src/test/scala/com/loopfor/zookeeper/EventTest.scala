@@ -49,22 +49,22 @@ class EventTest extends AnyFunSuite {
 
   test("match NodeEvents") {
     Created(PATH) match {
-      case Created(p) if (p == PATH) => ()
+      case Created(p) => assert(p === PATH)
     }
     Deleted(PATH) match {
-      case Deleted(p) if (p == PATH) => ()
+      case Deleted(p) => assert(p === PATH)
     }
     DataChanged(PATH) match {
-      case DataChanged(p) if (p == PATH) => ()
+      case DataChanged(p) => assert(p === PATH)
     }
     ChildrenChanged(PATH) match {
-      case ChildrenChanged(p) if (p == PATH) => ()
+      case ChildrenChanged(p) => assert(p === PATH)
     }
     ChildWatchRemoved(PATH) match {
-      case ChildWatchRemoved(p) if (p == PATH) => ()
+      case ChildWatchRemoved(p) => assert(p === PATH)
     }
     DataWatchRemoved(PATH) match {
-      case DataWatchRemoved(p) if (p == PATH) => ()
+      case DataWatchRemoved(p) => assert(p === PATH)
     }
   }
 

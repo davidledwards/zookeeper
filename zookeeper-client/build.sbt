@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 lazy val compilerSettings = Seq(
-  scalaVersion := "2.13.3",
+  scalaVersion := "2.13.8",
   scalacOptions ++= Seq(
     "-target:11",
     "-deprecation",
@@ -30,7 +30,7 @@ lazy val dependencySettings = Seq(
     "org.apache.zookeeper" % "zookeeper" % "3.6.1" exclude("jline", "jline"),
 
     // Test
-    "org.scalatest" %% "scalatest" % "3.2.0" % "test",
+    "org.scalatest" %% "scalatest" % "3.2.13" % "test",
     "io.dropwizard.metrics" % "metrics-core" % "3.2.5" % "test" exclude("org.slf4j", "slf4j-api"),
     "org.xerial.snappy" % "snappy-java" % "1.1.7"
   )
@@ -73,7 +73,7 @@ lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-client",
     organization := "com.loopfor.zookeeper",
-    version := "1.5",
+    version := "1.6-SNAPSHOT",
     description := "Scala API for ZooKeeper",
     homepage := Some(url("https://github.com/davidledwards/zookeeper")),
     licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),

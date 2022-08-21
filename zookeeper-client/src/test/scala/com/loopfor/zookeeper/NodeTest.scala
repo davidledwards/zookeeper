@@ -70,7 +70,7 @@ class NodeTest extends ZookeeperSuite {
     }
   }
 
-  test("create  node") { root =>
+  test("create node") { root =>
     val path = root.resolve("foo")
     val node = Node(path).create(Array(), ACL.AnyoneAll, Persistent)
     assert(node.path === path)

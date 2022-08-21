@@ -17,7 +17,7 @@ enablePlugins(PackPlugin)
 import xerial.sbt.pack.PackPlugin._
 
 lazy val compilerSettings = Seq(
-  scalaVersion := "2.13.3",
+  scalaVersion := "2.13.8",
   scalacOptions ++= Seq(
     "-target:11",
     "-deprecation",
@@ -30,13 +30,13 @@ lazy val compilerSettings = Seq(
 lazy val dependencySettings = Seq(
   libraryDependencies ++= Seq(
     // Compile
-    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.5",
+    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6-SNAPSHOT",
     "com.loopfor.scalop" %% "scalop" % "2.3",
     "jline" % "jline" % "2.14.2",
     "log4j" % "log4j" % "1.2.16" % "runtime" exclude("javax.jms", "jms"),
 
     // Test
-    "org.scalatest" %% "scalatest" % "3.2.0" % "test"
+    "org.scalatest" %% "scalatest" % "3.2.13" % "test"
   )
 )
 
@@ -77,7 +77,7 @@ lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-cli",
     organization := "com.loopfor.zookeeper",
-    version := "1.5",
+    version := "1.6-SNAPSHOT",
     description := "ZooKeeper CLI",
     homepage := Some(url("https://github.com/davidledwards/zookeeper")),
     licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
