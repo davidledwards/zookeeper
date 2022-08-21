@@ -27,6 +27,7 @@ object ServerFixture {
 
   def apply(): ZooKeeperServer = {
     System.setProperty("zookeeper.extendedTypesEnabled", "true")
+    System.setProperty("zookeeper.maxCnxns", "1")
     val dir = new File(TMP_PATH, "zk-" + UUID.randomUUID())
     val server = new ZooKeeperServer(dir, dir, TICK_TIME)
     val con = new NIOServerCnxnFactory
