@@ -22,7 +22,6 @@ import java.io.{BufferedReader, File, FileInputStream, FileNotFoundException, IO
 import java.net.InetSocketAddress
 import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicReference
-import org.apache.log4j.{Level, LogManager, PropertyConfigurator}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
@@ -111,12 +110,11 @@ options:
               case Some((file, level)) =>
                 System.setProperty("zk.log", file.getAbsolutePath)
                 System.setProperty("zk.level", level.toString)
-                "log.properties"
+                "logback-enabled.xml"
               case _ =>
-                "nolog.properties"
+                "logback-disabled.xml"
             }
-            LogManager.resetConfiguration()
-            PropertyConfigurator.configure(Thread.currentThread.getContextClassLoader.getResource(rc))
+            System.setProperty("logback.configurationFile", rc)
 
             if (verbose) {
               val hosts = (servers.map { s => s"${s.getHostName}:${s.getPort}" }).mkString(",")
@@ -224,15 +222,15 @@ options:
     ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::
     ("quiet", 'q') ~> just(true) ~~ false ::
     "log" ~> as[File] ~~ new File(System.getProperty("user.home"), "zk.log") ::
-    "level" ~> as[Level] ~~ Level.WARN ::
+    "level" ~> as[Level] ~~ WarnLevel ::
     "nolog" ~> just(true) ~~ false ::
     Nil
 
   implicit def argToLevel(arg: String): Either[String, Level] = arg.toLowerCase match {
-    case "all" => Right(Level.ALL)
-    case "info" => Right(Level.INFO)
-    case "warn" => Right(Level.WARN)
-    case "error" => Right(Level.ERROR)
+    case "all" => Right(AllLevel)
+    case "info" => Right(InfoLevel)
+    case "warn" => Right(WarnLevel)
+    case "error" => Right(ErrorLevel)
     case _ => Left(s"$arg: must be one of (all, info, warn, error)")
   }
 

@@ -32,8 +32,7 @@ lazy val dependencySettings = Seq(
     // Compile
     "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6-SNAPSHOT",
     "com.loopfor.scalop" %% "scalop" % "2.3",
-    "jline" % "jline" % "2.14.2",
-    "log4j" % "log4j" % "1.2.16" % "runtime" exclude("javax.jms", "jms"),
+    "jline" % "jline" % "2.14.6",
 
     // Test
     "org.scalatest" %% "scalatest" % "3.2.13" % "test"

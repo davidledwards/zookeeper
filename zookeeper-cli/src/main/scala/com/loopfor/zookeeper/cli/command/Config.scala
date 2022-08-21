@@ -16,9 +16,9 @@
 package com.loopfor.zookeeper.cli.command
 
 import com.loopfor.zookeeper._
+import com.loopfor.zookeeper.cli.Level
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
-import org.apache.log4j.Level
 
 object Config {
   val Usage = """usage: config
