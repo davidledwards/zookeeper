@@ -18,7 +18,6 @@ package com.loopfor.zookeeper.cli.command
 import com.loopfor.zookeeper._
 import com.loopfor.zookeeper.cli.Level
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 
 object Config {
   val Usage = """usage: config
@@ -27,19 +26,16 @@ object Config {
 
   Possible session states, which indicate connectedness to the ZooKeeper
   cluster, include:
-    * Disconnected
-    * Connected
-    * ConnectedReadOnly
-    * AuthenticationFailed
-    * Authenticated
-    * Expired
-
-  In general, session state may change between connected and disconnected
-  because of temporary loss of connectivity, but once expired, the CLI must
-  be stopped before a new session can be established.
+    * associating
+    * connecting
+    * connected
+    * connected (read-only)
+    * not connected
+    * closed
+    * authentication failed
 """
 
-  def command(config: Configuration, log: Option[(File, Level)], state: AtomicReference[StateEvent]) = new CommandProcessor {
+  def command(config: Configuration, log: Option[(File, Level)], zk: Zookeeper) = new CommandProcessor {
     def apply(cmd: String, args: Seq[String], context: Path) = {
       val servers = config.servers.map { s => s.getHostName + ":" + s.getPort } mkString(",")
       val path = Path("/").resolve(config.path).normalize
@@ -50,7 +46,19 @@ object Config {
       println(s"servers: $servers")
       println(s"path: $path")
       println(s"timeout: ${config.timeout}")
-      println(s"session: ${state.get}")
+      val session = zk.session()
+      val state = session.state match {
+        case AssociatingState => "associating"
+        case AuthenticationFailedState => "authentication failed"
+        case ClosedState => "closed"
+        case ConnectedState => "connected"
+        case ConnectedReadOnlyState => "connected (read-only)"
+        case ConnectingState => "connecting"
+        case NotConnectedState => "not connected"
+        case s => s.toString
+      }
+      println(s"session: ${state}")
+      println(s"id: ${session.credential.id}")
       println(s"log: $logfile")
       context
     }

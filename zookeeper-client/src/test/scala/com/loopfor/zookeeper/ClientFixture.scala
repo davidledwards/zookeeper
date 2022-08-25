@@ -15,11 +15,32 @@
  */
 package com.loopfor.zookeeper
 
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.TimeUnit
 import scala.language._
 
 object ClientFixture {
+  private val CONNECT_TIMEOUT = 5000L
+
   def apply(port: Int): Zookeeper = {
-    val config = Configuration(("localhost", port) :: Nil)
-    Zookeeper(config)
+    // Used to synchronize on completion of ZK server connection.
+    val state = new SynchronousQueue[StateEvent]()
+
+    // Connect to ZK server.
+    val config = Configuration(("localhost", port) :: Nil).withWatcher {
+      (event, _) => state.put(event)
+    }
+    val zk = Zookeeper(config)
+
+    // Wait for ZK server connection to complete with announcement of first event,
+    // which is presumed to be successful.
+    state.poll(CONNECT_TIMEOUT, TimeUnit.MILLISECONDS) match {
+      case null =>
+        throw new IllegalStateException("connection to ZooKeeper server exceeded ${CONNECT_TIMEOUT} milliseconds")
+      case Connected =>
+        zk
+      case e =>
+        throw new IllegalStateException("${e}: unexpected event during connection to ZooKeeper")
+    }
   }
 }

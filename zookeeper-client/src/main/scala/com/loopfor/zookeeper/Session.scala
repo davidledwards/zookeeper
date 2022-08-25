@@ -29,6 +29,13 @@ import scala.language._
  */
 trait Session {
   /**
+   * Returns the current state of this session.
+   *
+   * @return the current state of this session
+   */
+  def state: State
+
+  /**
    * Returns the credential associated with this session.
    * 
    * @return the credential associated with this session
@@ -60,9 +67,10 @@ object Session {
     if (session == null) None else Some(session.credential, session.timeout)
 
   private[zookeeper] def apply(zk: ZooKeeper): Session = new Session {
+    val state: State = State(zk.getState)
     val credential: Credential = Credential(zk)
     val timeout: Duration = zk.getSessionTimeout.millis
 
-    override def toString: String = "Session(credential=" + credential + ",timeout=" + timeout + ")"
+    override def toString: String = s"Session(state=${state},credential=${credential},timeout=${timeout})"
   }
 }

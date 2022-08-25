@@ -21,7 +21,6 @@ import com.loopfor.zookeeper.cli.command._
 import java.io.{BufferedReader, File, FileInputStream, FileNotFoundException, IOException, InputStream, InputStreamReader}
 import java.net.InetSocketAddress
 import java.nio.charset.Charset
-import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
@@ -121,16 +120,13 @@ options:
               println(s"connecting to {${hosts}} @ ${if (path == "") "/" else path} ...")
             }
 
-            val state = new AtomicReference[StateEvent](Disconnected)
-            val config = Configuration(servers).withPath(path).withTimeout(timeout).withAllowReadOnly(readonly).withWatcher {
-              (event, session) => state.set(event)
-            }
+            val config = Configuration(servers).withPath(path).withTimeout(timeout).withAllowReadOnly(readonly)
             val zk = try Zookeeper(config) catch {
               case e: IOException => CLIException(s"I/O error: ${e.getMessage}")
             }
 
             val verbs = Map(
-                  "config" -> Config.command(config, log, state),
+                  "config" -> Config.command(config, log, zk),
                   "cd" -> Cd.command(zk),
                   "pwd" -> Pwd.command(zk),
                   "ls" -> Ls.command(zk),

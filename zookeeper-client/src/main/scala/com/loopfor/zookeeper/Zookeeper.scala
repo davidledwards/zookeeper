@@ -45,6 +45,16 @@ trait Zookeeper {
   def async: AsynchronousZookeeper
 
   /**
+   * Returns the session associated with ZooKeeper.
+   *
+   * Note that the connection with ZooKeeper is established asynchronously, which means there is no implied guarantee that
+   * the session has connected nor will eventually connect at the time of an instance of this trait is created.
+   *
+   * @return the session associated with ZooKeeper
+   */
+  def session(): Session
+
+  /**
    * Ensures that the value of a node, specified by the given path, is synchronized across the ZooKeeper cluster.
    * 
    * '''An important note on consistency''': ZooKeeper does not guarantee, for any given point in time, that all clients will
@@ -430,6 +440,8 @@ private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
   def sync: SynchronousZookeeper = new SynchronousZK(zk, exec)
 
   def async: AsynchronousZookeeper = new AsynchronousZK(zk, exec)
+
+  def session(): Session = Session(zk)
 
   def ensure(path: String): Future[Unit] = {
     val p = Promise[Unit]()
