@@ -16,5 +16,5 @@
 package com.loopfor.zookeeper.cli
 
 object Version {
-  val CLI = "1.5"
+  val CLI = "1.6"
 }
