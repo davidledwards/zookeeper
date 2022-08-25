@@ -48,7 +48,7 @@ trait Zookeeper {
    * Returns the session associated with ZooKeeper.
    *
    * Note that the connection with ZooKeeper is established asynchronously, which means there is no implied guarantee that
-   * the session has connected nor will eventually connect at the time of an instance of this trait is created.
+   * the session has connected nor will eventually connect at the time that an instance of this trait is created.
    *
    * @return the session associated with ZooKeeper
    */
