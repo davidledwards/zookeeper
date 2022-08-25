@@ -4,11 +4,11 @@ A functional API layered over the ZooKeeper client.
 
 ## Documentation
 
-API documentation can be found [here](https://davidedwards.io/zookeeper/api/1.5/com/loopfor/zookeeper/index.html).
+API documentation can be found [here](https://davidedwards.io/zookeeper/api/1.6/com/loopfor/zookeeper/index.html).
 
 ## Dependency Information
 
-This library is published in the Maven Central Repository. Dependency information can be found [here](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-client_2.13/1.5/jar).
+This library is published in the Maven Central Repository. Dependency information can be found [here](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-client_2.13/1.6/jar).
 
 ## License
 

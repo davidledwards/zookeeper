@@ -4,12 +4,12 @@ A new command line program designed to replace `zkCli.sh`, which comes with the 
 
 ## Installing
 
-The CLI program can be downloaded from the Sonatype Repository in both [tar](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.5/tar.gz) and [zip](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.5/zip) formats.
+The CLI program can be downloaded from the Sonatype Repository in both [tar](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.6/tar.gz) and [zip](https://search.maven.org/artifact/com.loopfor.zookeeper/zookeeper-cli/1.6/zip) formats.
 
 Unpacking the assembly will produce the following output:
 
 ```shell
-zookeeper-cli-1.5/
+zookeeper-cli-1.6/
 + bin/
   + zk
   + zk.bat
@@ -18,7 +18,7 @@ zookeeper-cli-1.5/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.5/bin/zk` in your `PATH` or create an alias.
+For convenience, you might place `zookeeper-cli-1.6/bin/zk` in your `PATH` or create an alias.
 
 ## Helpful Tips
 

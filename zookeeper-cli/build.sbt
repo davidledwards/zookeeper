@@ -30,7 +30,7 @@ lazy val compilerSettings = Seq(
 lazy val dependencySettings = Seq(
   libraryDependencies ++= Seq(
     // Compile
-    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6-SNAPSHOT",
+    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6",
     "com.loopfor.scalop" %% "scalop" % "2.3",
     "jline" % "jline" % "2.14.6",
 
@@ -76,7 +76,7 @@ lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-cli",
     organization := "com.loopfor.zookeeper",
-    version := "1.6-SNAPSHOT",
+    version := "1.6",
     description := "ZooKeeper CLI",
     homepage := Some(url("https://github.com/davidledwards/zookeeper")),
     licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
