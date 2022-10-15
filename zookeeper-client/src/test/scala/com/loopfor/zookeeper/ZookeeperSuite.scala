@@ -19,6 +19,7 @@ import org.apache.zookeeper.server.ZooKeeperServer
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.FixtureAnyFunSuite
 import java.util.UUID
+import org.scalatest.FixtureTestSuite
 
 abstract class ZookeeperSuite extends FixtureAnyFunSuite with BeforeAndAfterAll {
   type FixtureParam = Path

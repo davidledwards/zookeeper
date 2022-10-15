@@ -15,6 +15,8 @@
  */
 package com.loopfor.zookeeper
 
+import scala.language.implicitConversions
+
 import java.net.{InetAddress, Inet4Address, UnknownHostException}
 import org.apache.zookeeper.ZooDefs.Ids
 import org.apache.zookeeper.data.{Id => ZId}
@@ -27,21 +29,21 @@ import scala.util.{Failure, Success, Try}
 sealed trait Id {
   /**
    * Returns the scheme.
-   * 
+   *
    * @return a string representing the scheme
    */
   def scheme: String
 
   /**
    * Returns the id.
-   * 
+   *
    * @return a string representing the id
    */
   def id: String
 
   /**
    * Returns an ACL for this identity using the given permission.
-   * 
+   *
    * @param permission the bitwise union of permission that apply to the ACL
    * @return an ACL with the given `permission`
    */
@@ -130,7 +132,7 @@ object Id {
 
   /**
    * An identity whose scheme is "`auth`" and id is "".
-   * 
+   *
    * This is a special identity, usable only while setting ACLs, that is substituted with the identities used during client
    * authentication.
    *
@@ -140,25 +142,25 @@ object Id {
 
   /**
    * Constructs a new identity.
-   * 
+   *
    * @param scheme a string representing the scheme
    * @param id a string representing the id
    * @return an identity with the given `scheme` and `id`
    *
    * @throws IllegalArgumentException if a valid identity cannot be constructed from `scheme` and `id`
-   * 
+   *
    * @see [[parse]]
    */
   def apply(scheme: String, id: String): Id = apply(scheme + ":" + id)
 
   /**
    * Constructs a new identity from the input string `s`.
-   * 
+   *
    * @param s a string representing the identity
    * @return the identity in `s` if it conforms to the proper syntax
-   * 
+   *
    * @throws IllegalArgumentException if `s` does not conform to the proper syntax
-   * 
+   *
    * @see [[parse]]
    */
   def apply(s: String): Id = parse(s) match {
@@ -170,7 +172,7 @@ object Id {
 
   /**
    * Used in pattern matching to deconstruct an identity.
-   * 
+   *
    * @param id selector value
    * @return a `Some` containing `scheme` and `id` if the selector value is not `null`, otherwise `None`
    */
@@ -179,10 +181,10 @@ object Id {
 
   /**
    * Parses the identity in the input string `s`.
-   * 
+   *
    * The syntax of `s` is `"''scheme'':''id''"`, where the `:` delimiter may be omitted if ''id'' is not required for the
    * given ''scheme''.
-   * 
+   *
    * @param s a string representing the identity
    * @return a `Success` containing the identity in `s` if it conforms to the proper syntax, otherwise a `Failure`
    * containing the offending exception
@@ -190,7 +192,7 @@ object Id {
   def parse(s: String): Try[Id] = Try {
     def error(message: String): Nothing =
       throw new IllegalArgumentException(s"${s}: ${message}")
-  
+
     s.split(":", 2) match {
       case Array("world", id) =>
         if (id == "anyone") WorldId

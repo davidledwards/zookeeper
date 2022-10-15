@@ -31,11 +31,11 @@ case class ACL(id: Id, permission: Int) extends ZACL(permission, id.zid)
 
 /**
  * Constructs and deconstructs [[ACL]] values.
- * 
+ *
  * The permissions assigned to an ACL are constructed by performing a bitwise union of individual permission attributes:
  * [[Read]], [[Write]], [[Create]], [[Delete]], [[Admin]]. In addition, the [[All]] permission encompasses all of these
  * attributes.
- * 
+ *
  * Several commonly used ACL values have been predefined for sake of convenience: [[AnyoneAll]], [[AnyoneRead]],
  * [[CreatorAll]].
  *
@@ -69,7 +69,7 @@ object ACL {
 
   /**
    * A composition of all permissions.
-   * 
+   *
    * This is equivalent to the bitwise union of the following permissions:
    * {{{
    * Read | Write | Create | Delete | Admin
@@ -94,10 +94,10 @@ object ACL {
 
   /**
    * Constructs a new ACL from the input string `s`.
-   * 
+   *
    * @param s a string representing the ACL
    * @return the ACL in `s` if it conforms to the specific syntax
-   * 
+   *
    * @throws IllegalArgumentException if `s` does not conform to the proper syntax
    *
    * @see [[parse]]
@@ -109,7 +109,7 @@ object ACL {
 
   /**
    * Parses the ACL in the input string `s`.
-   * 
+   *
    * The syntax of `s` is `"''scheme'':''id''=[rwcda*]"`, where the following apply:
    *  - the `:` delimiter may be omitted if ''id'' is not required
    *  - `rwcda*` may be repeated zero or more times
@@ -121,7 +121,7 @@ object ACL {
   def parse(s: String): Try[ACL] = Try {
     def error(message: String): Nothing =
       throw new IllegalArgumentException(s"${s}: ${message}")
-  
+
     s.split("=", 2) match {
       case Array(id, permission) =>
         Id.parse(id) match {
@@ -142,7 +142,7 @@ object ACL {
     zacl.asScala.foldLeft(Seq[ACL]()) { case (acl, zacl) => acl :+ ACL(zacl)}
 
   private[zookeeper] def toZACL(acl: Seq[ACL]): java.util.List[ZACL] =
-    acl.foldLeft(Seq[ZACL]()) { case (zacl, acl) => zacl :+ toZACL(acl) } asJava
+    acl.foldLeft(Seq[ZACL]()) { case (zacl, acl) => zacl :+ toZACL(acl) }.asJava
 
   private[zookeeper] def toZACL(acl: ACL): ZACL = acl.asInstanceOf[ZACL]
 

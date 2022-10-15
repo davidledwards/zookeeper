@@ -15,6 +15,8 @@
  */
 package com.loopfor
 
+import scala.language.implicitConversions
+
 import java.net.InetSocketAddress
 import org.apache.zookeeper.KeeperException
 import scala.language._
@@ -55,7 +57,7 @@ package object zookeeper {
 
   /**
    * Converts the tuple (''host'',''port'') to an Internet socket address.
-   * 
+   *
    * @return an `InetSocketAddress` composed from the given `addr` tuple
    */
   implicit def tupleToInetSocketAddress(addr: (String, Int)): InetSocketAddress =

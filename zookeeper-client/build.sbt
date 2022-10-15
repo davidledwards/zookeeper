@@ -13,8 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+lazy val scala213 = "2.13.10"
+lazy val scala31 = "3.1.3"
+lazy val supportedScalaVersions = List(scala213, scala31)
+
 lazy val compilerSettings = Seq(
-  scalaVersion := "2.13.8",
+  scalaVersion := scala213,
+  crossScalaVersions := supportedScalaVersions,
   scalacOptions ++= Seq(
     "-target:11",
     "-deprecation",

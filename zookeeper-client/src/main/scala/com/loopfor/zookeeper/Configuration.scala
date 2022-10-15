@@ -15,6 +15,8 @@
  */
 package com.loopfor.zookeeper
 
+import scala.language.implicitConversions
+
 import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -26,36 +28,36 @@ import scala.language._
 trait Configuration {
   /**
    * Returns a sequence of server endpoints in this cluster.
-   * 
+   *
    * These endpoints do not necessarily need to reflect all servers in the cluster, only those to which the client desires to
    * make a possible connection.
-   * 
+   *
    * @return a sequence of socket addresses
    */
   def servers: Seq[InetSocketAddress]
 
   /**
    * Returns an optional root path.
-   * 
+   *
    * @return the root path if specified, otherwise an empty string
    */
   def path: String
 
   /**
    * Returns the period of time after which the session is expired.
-   * 
+   *
    * Note that this value is only a proposal and that ZooKeeper may use a different timeout.
-   * 
+   *
    * @return the session timeout
    */
   def timeout: Duration
 
   /**
    * Returns an optional function that is called when state changes occur in the session.
-   * 
+   *
    * Note that a new session may be established if the client disconnects and reconnects to ZooKeeper, particularly with
    * respect to the session `id` and `password`.
-   * 
+   *
    * @return a function that receives session state changes, otherwise `null` if not specified
    */
   def watcher: (StateEvent, Session) => Unit
@@ -63,16 +65,16 @@ trait Configuration {
   /**
    * Returns `true` if the client will allow read-only connections to ZooKeeper under conditions in which a majority of
    * servers cannot be established.
-   * 
+   *
    * @return `true` if read-only is allowed, `false` otherwise
    */
   def allowReadOnly: Boolean
 
   /**
    * Returns an optional execution context to which asynchronous tasks are submitted.
-   * 
+   *
    * Use this feature when an application container prefers to manage the execution context.
-   * 
+   *
    * @return an execution context if specified, otherwise `null`
    */
   def exec: ExecutionContext
@@ -80,11 +82,11 @@ trait Configuration {
 
 /**
  * Constructs and deconstructs [[Configuration]] values.
- * 
+ *
  * A configuration is constructed by first specifying ''required'' attributes via `Configuration()` and then attaching
  * ''optional'' attributes as necessary. A set of implicit methods conveniently convert between instances of [[Configuration]]
  * and [[Configuration.Builder Builder]].
- * 
+ *
  * Example:
  * {{{
  * val config = Configuration {
@@ -95,7 +97,7 @@ trait Configuration {
  *   // ...
  * }
  * }}}
- * 
+ *
  * The type of `config` above is [[Configuration.Builder Builder]] since an implicit conversion occurred when attaching
  * optional attributes using the various `with` methods. An explicit conversion back to [[Configuration]], which can be
  * accomplished using `build()`, is unnecessary since another implicit will perform this function automatically.
@@ -103,7 +105,7 @@ trait Configuration {
 object Configuration {
   /**
    * Constructs a new default configuration using the given servers.
-   * 
+   *
    * @param servers sequence of socket addresses corresponding to server endpoints
    * @return a default configuration with the given `servers`
    */
@@ -111,7 +113,7 @@ object Configuration {
 
   /**
    * Used in pattern matching to deconstruct a configuration.
-   * 
+   *
    * @param config selector value
    * @return a `Some` containing configuration attributes if the selector value is not `null`, otherwise `None`
    */
