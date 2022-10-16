@@ -22,7 +22,7 @@ lazy val compilerSettings = Seq(
   scalaVersion := scala213,
   crossScalaVersions := supportedScalaVersions,
   scalacOptions ++= Seq(
-    "-target:11",
+    "-release:11",
     "-deprecation",
     "-unchecked",
     "-feature",
@@ -68,13 +68,6 @@ lazy val publishSettings = Seq(
   )
 )
 
-lazy val eclipseSettings = {
-  import EclipseKeys._
-  Seq(
-    executionEnvironment := Some(EclipseExecutionEnvironment.JRE11)
-  )
-}
-
 lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-client",
@@ -92,5 +85,4 @@ lazy val rootProject = (project in file(".")).
   settings(compilerSettings: _*).
   settings(dependencySettings: _*).
   settings(docSettings: _*).
-  settings(publishSettings: _*).
-  settings(eclipseSettings: _*)
+  settings(publishSettings: _*)
