@@ -15,11 +15,9 @@
  */
 package com.loopfor
 
-import scala.language.implicitConversions
-
 import java.net.InetSocketAddress
 import org.apache.zookeeper.KeeperException
-import scala.language._
+import scala.language.implicitConversions
 
 /**
  * A Scala API for ZooKeeper.

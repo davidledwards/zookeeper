@@ -15,12 +15,10 @@
  */
 package com.loopfor.zookeeper
 
-import scala.language.implicitConversions
-
 import java.net.{InetAddress, Inet4Address, UnknownHostException}
 import org.apache.zookeeper.ZooDefs.Ids
 import org.apache.zookeeper.data.{Id => ZId}
-import scala.language._
+import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
 /**

@@ -15,12 +15,10 @@
  */
 package com.loopfor.zookeeper
 
-import scala.language.implicitConversions
-
 import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language._
+import scala.language.implicitConversions
 
 /**
  * A client ''configuration'' for connecting to a ZooKeeper cluster.
