@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-lazy val scala213 = "2.13.10"
-lazy val scala31 = "3.1.3"
-lazy val supportedScalaVersions = List(scala213, scala31)
+lazy val scala_2_13 = "2.13.10"
+lazy val scala_3_2 = "3.2.0"
+lazy val supportedScalaVersions = List(scala_2_13, scala_3_2)
 
 lazy val compilerSettings = Seq(
-  scalaVersion := scala213,
+  scalaVersion := scala_2_13,
   crossScalaVersions := supportedScalaVersions,
   scalacOptions ++= Seq(
     "-release:11",
