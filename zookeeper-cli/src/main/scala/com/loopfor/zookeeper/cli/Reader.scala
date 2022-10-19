@@ -47,7 +47,7 @@ object Reader {
   }
 
   private class PathCompleter(zk: Zookeeper, context: Path) extends Completer {
-    private implicit val _zk = zk
+    private implicit val _zk: Zookeeper = zk
 
     def complete(buffer: String, cursor: Int, candidates: java.util.List[CharSequence]): Int = {
       val (node, prefix) = if (buffer == null)

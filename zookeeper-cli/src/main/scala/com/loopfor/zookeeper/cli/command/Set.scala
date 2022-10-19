@@ -46,7 +46,7 @@ options:
   private val UTF_8 = Charset forName "UTF-8"
 
   def command(zk: Zookeeper) = new CommandProcessor {
-    implicit val _zk = zk
+    implicit val _zk: Zookeeper = zk
 
     val opts =
       ("encoding", 'e') ~> as[Charset] ~~ UTF_8 ::

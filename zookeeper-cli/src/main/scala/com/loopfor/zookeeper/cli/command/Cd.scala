@@ -31,7 +31,7 @@ options:
 """
 
   def command(zk: Zookeeper) = new CommandProcessor {
-    implicit val _zk = zk
+    implicit val _zk: Zookeeper = zk
     var last = Path("/")
 
     val opts =

@@ -17,9 +17,9 @@ enablePlugins(PackPlugin)
 import xerial.sbt.pack.PackPlugin._
 
 lazy val compilerSettings = Seq(
-  scalaVersion := "2.13.8",
+  scalaVersion := "3.2.0",
   scalacOptions ++= Seq(
-    "-target:11",
+    "-release:11",
     "-deprecation",
     "-unchecked",
     "-feature",
@@ -30,8 +30,8 @@ lazy val compilerSettings = Seq(
 lazy val dependencySettings = Seq(
   libraryDependencies ++= Seq(
     // Compile
-    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6",
-    "com.loopfor.scalop" %% "scalop" % "2.3",
+    "com.loopfor.zookeeper" %% "zookeeper-client" % "1.6.1",
+    "com.loopfor.scalop" %% "scalop" % "2.3.1",
     "jline" % "jline" % "2.14.6",
 
     // Test
@@ -65,13 +65,6 @@ lazy val publishSettings = publishPackArchives ++ Seq(
   )
 )
 
-lazy val eclipseSettings = {
-  import EclipseKeys._
-  Seq(
-    executionEnvironment := Some(EclipseExecutionEnvironment.JavaSE18)
-  )
-}
-
 lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-cli",
@@ -89,5 +82,4 @@ lazy val rootProject = (project in file(".")).
   settings(compilerSettings: _*).
   settings(dependencySettings: _*).
   settings(packageSettings: _*).
-  settings(publishSettings: _*).
-  settings(eclipseSettings: _*)
+  settings(publishSettings: _*)

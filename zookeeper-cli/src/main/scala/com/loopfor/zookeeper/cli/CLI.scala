@@ -24,7 +24,7 @@ import java.nio.charset.Charset
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
-import scala.language._
+import scala.language.implicitConversions
 
 object CLI {
   def main(args: Array[String]): Unit = {
@@ -239,6 +239,7 @@ options:
       }
       read(ArrayBuffer.empty)
     }
+
     val cmds = optr[Option[String]]("file") match {
       case Some(name) =>
         val file = try new FileInputStream(name) catch {
@@ -267,13 +268,19 @@ options:
   }
 
   private def serverArgs(optr: OptResult): Seq[InetSocketAddress] = {
-    def isHostChar(c: Char) = {
+    def isHostChar(c: Char): Boolean = {
       (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'
     }
-    def validated(host: String) = {
-      if (host.forall { isHostChar _ }) host
-      else throw CLIException(s"$host: invalid host name")
+
+    def validate(host: String): String = {
+      // forall() was not working with Scala 3 compiler because of an implicit cast to Level, hence reason for
+      // use of fold operation.
+      if (host.foldLeft(true) { (valid, c) => valid && isHostChar(c) })
+        host
+      else
+        throw CLIException(s"$host: invalid host name")
     }
+
     optr.args match {
       case Nil => CLIException("no servers specified")
       case params => params.map { server =>
@@ -289,7 +296,7 @@ options:
                   case _: NumberFormatException => CLIException(s"$server: port invalid; expecting `host[:port]`")
                 }
               })
-        new InetSocketAddress(validated(host), port)
+        new InetSocketAddress(validate(host), port)
       }
     }
   }

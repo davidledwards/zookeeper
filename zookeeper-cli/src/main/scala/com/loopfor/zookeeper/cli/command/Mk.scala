@@ -82,7 +82,7 @@ options:
     Nil
 
   def command(zk: Zookeeper) = new CommandProcessor {
-    implicit val _zk = zk
+    implicit val _zk: Zookeeper = zk
 
     def apply(cmd: String, args: Seq[String], context: Path): Path = {
       val optr = opts <~ args
@@ -98,7 +98,7 @@ options:
   }
 
   def find(zk: Zookeeper, args: Seq[String]) = new FindProcessor {
-    implicit val _zk = zk
+    implicit val _zk: Zookeeper = zk
     val optr = opts <~ args
     val recurse = optr[Boolean]("recursive")
     val disp = dispOpt(optr)
