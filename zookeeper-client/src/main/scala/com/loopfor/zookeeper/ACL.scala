@@ -158,16 +158,20 @@ object ACL {
     def unapply(s: String): Option[Int] = {
       if (s == null) None
       else {
-        val perms = s.foldLeft(0) { case (p, c) =>
-            if (c == 'r') p | Read
-            else if (c == 'w') p | Write
-            else if (c == 'c') p | Create
-            else if (c == 'd') p | Delete
-            else if (c == 'a') p | Admin
-            else if (c == '*') p | All
-            else return None
+        s.foldLeft(Some(0): Option[Int]) { case (p, c) =>
+          p match {
+            case Some(_p) =>
+              if (c == 'r') Some(_p | Read)
+              else if (c == 'w') Some(_p | Write)
+              else if (c == 'c') Some(_p | Create)
+              else if (c == 'd') Some(_p | Delete)
+              else if (c == 'a') Some(_p | Admin)
+              else if (c == '*') Some(_p | All)
+              else None
+            case None =>
+              None
+          }
         }
-        Some(perms)
       }
     }
   }
