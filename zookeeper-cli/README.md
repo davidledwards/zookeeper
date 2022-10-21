@@ -18,7 +18,7 @@ zookeeper-cli-1.6.1/
   + ...
 ```
 
-For convenience, you might place `zookeeper-cli-1.6/bin/zk` in your `PATH` or create an alias.
+For convenience, you might place `zookeeper-cli-1.6.1/bin/zk` in your `PATH` or create an alias.
 
 ## Helpful Tips
 
