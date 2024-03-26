@@ -218,6 +218,21 @@ trait SynchronousZookeeper extends Zookeeper {
    * }}}
    */
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]]
+
+  /**
+   * For the given znode path, removes all the registered watchers of given watcherType.
+   *
+   * Watcher shouldn't be null. A successful call guarantees that, the removed watcher won't be triggered.
+   *
+   * @param path        the path of the node
+   * @param watcherType the type of watcher to be removed
+   * @param local       whether the watcher can be removed locally when there is no server connection
+   * @throws InterruptedException     - If the server transaction is interrupted.
+   * @throws NoWatcherException       - if no watcher exists that match the specified parameters
+   * @throws KeeperException          - If the server signals an error with a non-zero error code.
+   * @throws IllegalArgumentException - if any of the following is true: path is invalid or watcher is null
+   */
+  def removeAllWatches(path: String, watcherType: WatcherType, local: Boolean): Unit
 }
 
 /**
@@ -265,6 +280,34 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
    * @throws NoNodeException if the node does not exist
    */
   def children(path: String): Seq[String]
+
+  /**
+   * Sets a persistent watch for any changes on the specified path, can be recursive.
+   *
+   * The watch is triggered when one of the following conditions occur:
+   *  - the session state changes
+   *
+   * @param path the path of the node
+   * @param mode the watch mode
+   * @throws InterruptedException - If the server transaction is interrupted.
+   * @throws KeeperException - If the server signals an error with a non-zero error code.
+   */
+  def addWatch(path: String, mode: WatchMode): Unit
+
+  /**
+   * For the given znode path, removes the specified watcher of given watcherType.
+   *
+   * Watcher shouldn't be null. A successful call guarantees that, the removed watcher won't be triggered.
+   *
+   * @param path the path of the node
+   * @param watcherType the type of watcher to be removed
+   * @param local whether the watcher can be removed locally when there is no server connection
+   * @throws InterruptedException - If the server transaction is interrupted.
+   * @throws NoWatcherException - if no watcher exists that match the specified parameters
+   * @throws KeeperException - If the server signals an error with a non-zero error code.
+   * @throws IllegalArgumentException - if any of the following is true: path is invalid or watcher is null
+   */
+  def removeWatches(path: String, watcherType: WatcherType, local: Boolean): Unit
 }
 
 /**
@@ -383,6 +426,22 @@ trait AsynchronousZookeeper extends Zookeeper {
    * }}}
    */
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper
+
+  /**
+   * For the given znode path, removes the specified watcher of given watcherType.
+   *
+   * Watcher shouldn't be null. A successful call guarantees that, the removed watcher won't be triggered.
+   *
+   * @param path        the path of the node
+   * @param watcherType the type of watcher to be removed
+   * @param local       whether the watcher can be removed locally when there is no server connection
+   * @return a future, which upon failure, yields one of the following exceptions:
+   * InterruptedException     - If the server transaction is interrupted.
+   * NoWatcherException       - if no watcher exists that match the specified parameters
+   * KeeperException          - If the server signals an error with a non-zero error code.
+   * IllegalArgumentException - if any of the following is true: path is invalid or watcher is null
+   */
+  def removeAllWatches(path: String, watcherType: WatcherType, local: Boolean): Future[Unit]
 }
 
 /**
@@ -432,6 +491,35 @@ trait AsynchronousWatchableZookeeper extends Zookeeper {
    *  - NoNodeException if the node does not exist
    */
   def children(path: String): Future[(Seq[String], Status)]
+
+  /**
+   * Asynchronously Add a watch to the given znode using the given mode.
+   *
+   * Note: not all watch types can be set with this method.
+   * Only the modes available in WatchMode can be set with this method.
+   *
+   * @param path the path of the node
+   * @param mode the watch mode
+   * @return a future, which upon failure, yields one of the following exceptions:
+   *  IllegalArgumentException - if an invalid path is specified
+   */
+  def addWatch(path: String, mode: WatchMode): Future[Unit]
+
+  /**
+   * For the given znode path, removes the specified watcher of given watcherType.
+   *
+   * Watcher shouldn't be null. A successful call guarantees that, the removed watcher won't be triggered.
+   *
+   * @param path        the path of the node
+   * @param watcherType the type of watcher to be removed
+   * @param local       whether the watcher can be removed locally when there is no server connection
+   * @return a future, which upon failure, yields one of the following exceptions:
+   * InterruptedException     - If the server transaction is interrupted.
+   * NoWatcherException       - if no watcher exists that match the specified parameters
+   * KeeperException          - If the server signals an error with a non-zero error code.
+   * IllegalArgumentException - if any of the following is true: path is invalid or watcher is null
+   */
+  def removeWatches(path: String, watcherType: WatcherType, local: Boolean): Future[Unit]
 }
 
 private class BaseZK(zk: ZooKeeper, exec: ExecutionContext) extends Zookeeper {
@@ -502,6 +590,10 @@ private class SynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends BaseZ
     new SynchronousWatchableZK(zk, exec, fn)
   }
 
+  def removeAllWatches(path: String, watcherType: WatcherType, local: Boolean): Unit = {
+    zk.removeAllWatches(path, watcherType.watcherType, local)
+  }
+
   def transact(ops: Seq[Operation]): Either[Seq[Problem], Seq[Result]] = {
     try {
       val _ops = ops.map { _.op }
@@ -552,6 +644,14 @@ private class SynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: 
 
   def children(path: String): Seq[String] = {
     zk.getChildren(path, watcher).asScala.toList
+  }
+
+  def addWatch(path: String, mode: WatchMode): Unit = {
+    zk.addWatch(path, watcher, mode.mode)
+  }
+
+  def removeWatches(path: String, watcherType: WatcherType, local: Boolean): Unit = {
+    zk.removeWatches(path, watcher, watcherType.watcherType, local)
   }
 }
 
@@ -614,6 +714,12 @@ private class AsynchronousZK(zk: ZooKeeper, exec: ExecutionContext) extends Base
   def watch(fn: PartialFunction[Event, Unit]): AsynchronousWatchableZookeeper = {
     new AsynchronousWatchableZK(zk, exec, fn)
   }
+
+  def removeAllWatches(path: String, watcherType: WatcherType, local: Boolean): Future[Unit] = {
+    val p = Promise[Unit]()
+    zk.removeAllWatches(path, watcherType.watcherType, local, VoidHandler(p), null)
+    p.future
+  }
 }
 
 private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: PartialFunction[Event, Unit])
@@ -642,6 +748,18 @@ private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn:
   def children(path: String): Future[(Seq[String], Status)] = {
     val p = Promise[(Seq[String], Status)]()
     zk.getChildren(path, watcher, ChildrenHandler(p), null)
+    p.future
+  }
+
+  def addWatch(path: String, mode: WatchMode): Future[Unit] = {
+    val p = Promise[Unit]()
+    zk.addWatch(path, watcher, mode.mode, VoidHandler(p), null)
+    p.future
+  }
+
+  def removeWatches(path: String, watcherType: WatcherType, local: Boolean): Future[Unit] = {
+    val p = Promise[Unit]()
+    zk.removeWatches(path, watcher, watcherType.watcherType, local, VoidHandler(p), null)
     p.future
   }
 }
