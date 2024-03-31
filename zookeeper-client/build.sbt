@@ -72,7 +72,7 @@ lazy val rootProject = (project in file(".")).
   settings(
     name := "zookeeper-client",
     organization := "com.loopfor.zookeeper",
-    version := "1.6.1",
+    version := "1.7-SNAPSHOT",
     description := "Scala API for ZooKeeper",
     homepage := Some(url("https://github.com/davidledwards/zookeeper")),
     licenses := Seq("Apache License, Version 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
