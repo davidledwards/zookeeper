@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-lazy val scala_2_13 = "2.13.10"
-lazy val scala_3_2 = "3.2.0"
+lazy val scala_2_13 = "2.13.13"
+lazy val scala_3_2 = "3.2.2"
 lazy val supportedScalaVersions = List(scala_2_13, scala_3_2)
 
 lazy val compilerSettings = Seq(
@@ -33,7 +33,7 @@ lazy val compilerSettings = Seq(
 lazy val dependencySettings = Seq(
   libraryDependencies ++= Seq(
     // Compile
-    "org.apache.zookeeper" % "zookeeper" % "3.8.0" exclude("jline", "jline"),
+    "org.apache.zookeeper" % "zookeeper" % "3.9.2" exclude("jline", "jline"),
 
     // Test
     "org.scalatest" %% "scalatest" % "3.2.13" % "test",
