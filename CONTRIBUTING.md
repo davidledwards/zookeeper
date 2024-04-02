@@ -1,6 +1,6 @@
 # Contributing
 
-I welcome any suggestions for improving the software or hardware. Please adhere to the following instructions when [reporting bugs](#bugs) and [proposing enhancements](#enhancements).
+I welcome any suggestions for improving the software. Please adhere to the following instructions when [reporting bugs](#bugs) and [proposing enhancements](#enhancements).
 
 In all cases, I reserve the right to accept or deny any suggestions.
 
