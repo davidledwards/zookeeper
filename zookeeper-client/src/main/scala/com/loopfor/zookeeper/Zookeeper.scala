@@ -607,7 +607,7 @@ private class SynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn: 
   }
 
   def observe(path: String, recursive: Boolean = false): Unit = {
-    val mode = if (recursive) AddWatchMode.PERSISTENT else AddWatchMode.PERSISTENT_RECURSIVE
+    val mode = if (recursive) AddWatchMode.PERSISTENT_RECURSIVE else AddWatchMode.PERSISTENT
     zk.addWatch(path, watcher, mode)
   }
 
@@ -708,7 +708,7 @@ private class AsynchronousWatchableZK(zk: ZooKeeper, exec: ExecutionContext, fn:
 
   def observe(path: String, recursive: Boolean = false): Future[Unit] = {
     val p = Promise[Unit]()
-    val mode = if (recursive) AddWatchMode.PERSISTENT else AddWatchMode.PERSISTENT_RECURSIVE
+    val mode = if (recursive) AddWatchMode.PERSISTENT_RECURSIVE else AddWatchMode.PERSISTENT
     zk.addWatch(path, watcher, mode, VoidHandler(p), null)
     p.future
   }
