@@ -44,7 +44,7 @@ class ZookeeperTest extends ZookeeperSuite {
     val event = new LinkedBlockingQueue[NodeEvent](1)
     val zkw = zk.sync.watch {
       case e: NodeEvent => event.put(e)
-      case e => // ignore state changes
+      case _ => // ignore state changes
     }
 
     // Sets persistent, non-recursive watch on root node.
@@ -85,6 +85,58 @@ class ZookeeperTest extends ZookeeperSuite {
     // Verify exception if watch no longer associated with node.
     intercept[NoWatcherException] {
       zkw.unobserve(root.path, PersistentObserver)
+    }
+  }
+
+  test("persistent, recursive watch on node") { root =>
+    // Use blocking queue to relay events from watcher.
+    val event = new LinkedBlockingQueue[NodeEvent](1)
+    val zkw = zk.sync.watch {
+      case e: NodeEvent => event.put(e)
+      case _ => // ignore state changes
+    }
+
+    // Sets persistent, recursive watch on root node.
+    zkw.observe(root.path, true)
+
+    // Verify that creation of child node triggers watch.
+    var path = root.resolve("child_0").path
+    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    var e = event.take()
+    e match {
+      case Created(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Since watch is persistent, verify that creation of another child node triggers watch.
+    path = root.resolve("child_1").path
+    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    e = event.take()
+    e match {
+      case Created(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Since watch is recursive, creation of grandchild must trigger watch.
+    path = root.resolve("child_0/grandchild").path
+    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    e = event.take()
+    e match {
+      case Created(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify that watch is removed.
+    zkw.unobserve(root.path, PersistentRecursiveObserver)
+    e = event.take()
+    e match {
+      case PersistentWatchRemoved(p) => assert(p === root.path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify exception if watch no longer associated with node.
+    intercept[NoWatcherException] {
+      zkw.unobserve(root.path, PersistentRecursiveObserver)
     }
   }
 }
