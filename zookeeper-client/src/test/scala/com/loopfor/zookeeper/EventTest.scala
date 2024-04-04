@@ -111,5 +111,8 @@ class EventTest extends AnyFunSuite {
     NodeEvent(EventType.DataWatchRemoved, PATH) match {
       case DataWatchRemoved(p) if (p == PATH) => ()
     }
+    NodeEvent(EventType.PersistentWatchRemoved, PATH) match {
+      case PersistentWatchRemoved(p) if (p == PATH) => ()
+    }
   }
 }

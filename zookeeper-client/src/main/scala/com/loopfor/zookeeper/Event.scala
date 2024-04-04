@@ -84,7 +84,7 @@ private[zookeeper] object StateEvent {
   }
 
   private class Unrecognized(state: Int) extends StateEvent {
-    override def toString: String = "Unrecognized[" + state + "]"
+    override def toString: String = "UnrecognizedStateEvent[" + state + "]"
   }
 }
 
@@ -130,6 +130,11 @@ case class ChildWatchRemoved(path: String) extends NodeEvent
  */
 case class DataWatchRemoved(path: String) extends NodeEvent
 
+/**
+ * An event indicating that a persistent watch was removed.
+ */
+case class PersistentWatchRemoved(path: String) extends NodeEvent
+
 private[zookeeper] object NodeEvent {
   private val events = Map[Int, String => NodeEvent](
         EventType.NodeCreated.getIntValue -> { p => new Created(p) },
@@ -137,7 +142,8 @@ private[zookeeper] object NodeEvent {
         EventType.NodeDataChanged.getIntValue -> { p => new DataChanged(p) },
         EventType.NodeChildrenChanged.getIntValue -> { p => new ChildrenChanged(p) },
         EventType.ChildWatchRemoved.getIntValue -> { p => new ChildWatchRemoved(p) },
-        EventType.DataWatchRemoved.getIntValue -> { p => new DataWatchRemoved(p) }
+        EventType.DataWatchRemoved.getIntValue -> { p => new DataWatchRemoved(p) },
+        EventType.PersistentWatchRemoved.getIntValue -> { p => new PersistentWatchRemoved(p) }
         )
 
   def apply(event: EventType, path: String): NodeEvent = apply(event.getIntValue, path)
@@ -148,7 +154,7 @@ private[zookeeper] object NodeEvent {
   }
 
   private class Unrecognized(event: Int, val path: String) extends NodeEvent {
-    override def toString: String = "Unrecognized[" + event + "](" + path + ")"
+    override def toString: String = "UnrecognizedNodeEvent[" + event + "](" + path + ")"
   }
 }
 
