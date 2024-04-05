@@ -272,15 +272,16 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
    *
    * For non-recursive watches, the watch function is triggered when the following events occur:
    *  - the data associated with the node changes [[DataChanged]]
-   *  - direct child nodes are created or deleted [[ChildrenChanged]]
-   *  - when the watch is removed [[PersistentWatchRemoved]]
+   *  - a direct child node is created or deleted [[ChildrenChanged]]
    *
    * For recursive watches, the watch function is triggered when the following events occur:
-   * -
-   * The watch is triggered when one of the following conditions occur:
-   *  - the data associated with the node changes
+   *  - the data associated with any node in the tree changes [[DataChanged]]
+   *  - any child node in the tree is created [[Created]]
+   *  - any child node in the tree is deleted [[Deleted]]
+   *
+   * The watch is always triggered when the following events occur:
+   *  - the watch is removed [[PersistentWatchRemoved]]
    *  - the session state changes
-   * The watch is always triggered when session state changes.
    *
    * @param path the path of the node
    * @param recursive if the watch should apply to all child nodes
@@ -473,8 +474,17 @@ trait AsynchronousWatchableZookeeper extends Zookeeper {
   /**
    * Asynchronously sets a persistent watch for any changes on the node specified by the given path.
    *
-   * The watch is triggered when one of the following conditions occur:
-   *  - the data associated with the node changes
+   * For non-recursive watches, the watch function is triggered when the following events occur:
+   *  - the data associated with the node changes [[DataChanged]]
+   *  - a direct child node is created or deleted [[ChildrenChanged]]
+   *
+   * For recursive watches, the watch function is triggered when the following events occur:
+   *  - the data associated with any node in the tree changes [[DataChanged]]
+   *  - any child node in the tree is created [[Created]]
+   *  - any child node in the tree is deleted [[Deleted]]
+   *
+   * The watch is always triggered when the following events occur:
+   *  - the watch is removed [[PersistentWatchRemoved]]
    *  - the session state changes
    *
    * @param path the path of the node
