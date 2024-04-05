@@ -270,9 +270,17 @@ trait SynchronousWatchableZookeeper extends Zookeeper {
   /**
    * Sets a persistent watch for any changes on the node specified by the given path.
    *
+   * For non-recursive watches, the watch function is triggered when the following events occur:
+   *  - the data associated with the node changes [[DataChanged]]
+   *  - direct child nodes are created or deleted [[ChildrenChanged]]
+   *  - when the watch is removed [[PersistentWatchRemoved]]
+   *
+   * For recursive watches, the watch function is triggered when the following events occur:
+   * -
    * The watch is triggered when one of the following conditions occur:
    *  - the data associated with the node changes
    *  - the session state changes
+   * The watch is always triggered when session state changes.
    *
    * @param path the path of the node
    * @param recursive if the watch should apply to all child nodes

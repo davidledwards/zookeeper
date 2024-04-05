@@ -19,6 +19,9 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit.MILLISECONDS
 
 class ZookeeperTest extends ZookeeperSuite {
+  private val EmptyData = Array[Byte]()
+  private val TestData = Array[Byte](0xD, 0xE, 0xA, 0xD, 0xB, 0xE, 0xE, 0xF)
+
   test("valid session") { _ =>
     val session = zk.session()
     assert(session !== null)
@@ -50,24 +53,47 @@ class ZookeeperTest extends ZookeeperSuite {
     // Sets persistent, non-recursive watch on root node.
     zkw.observe(root.path)
 
-    // Verify that creation of child node triggers watch.
-    zk.sync.create(root.resolve("child_0").path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    // Verify that data change in root node triggers watch.
+    zk.sync.set(root.path, TestData, None)
     var e = event.take()
     e match {
-      case ChildrenChanged(p) => assert(p === root.path)
+      case DataChanged(p) => assert(p === root.path)
       case _ => fail(e.toString)
     }
 
-    // Since watch is persistent, verify that creation of another child node triggers watch.
-    zk.sync.create(root.resolve("child_1").path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    // Verify that creation of child node triggers watch.
+    zk.sync.create(root.resolve("child_0").path, TestData, ACL.AnyoneAll, Persistent)
     e = event.take()
     e match {
       case ChildrenChanged(p) => assert(p === root.path)
       case _ => fail(e.toString)
     }
 
+    // Verify that data change in child node does not trigger watch.
+    zk.sync.set(root.resolve("child_0").path, EmptyData, None)
+    e = event.poll(10, MILLISECONDS)
+    e match {
+      case null => // expected
+      case _ => fail(e.toString)
+    }
+
+    // Since watch is persistent, verify that creation of another child node triggers watch.
+    zk.sync.create(root.resolve("child_1").path, TestData, ACL.AnyoneAll, Persistent)
+    e = event.take()
+    e match {
+      case ChildrenChanged(p) => assert(p === root.path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify that deletion of child node triggers watch.
+    zk.sync.delete(root.resolve("child_1").path, None)
+    e = event.take()
+    e match {
+      case ChildrenChanged(p) => assert(p === root.path)
+    }
+  
     // Since watch is non-recursive, creation of grandchild must not trigger watch.
-    zk.sync.create(root.resolve("child_0/grandchild").path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    zk.sync.create(root.resolve("child_0/grandchild").path, TestData, ACL.AnyoneAll, Persistent)
     e = event.poll(10, MILLISECONDS)
     e match {
       case null => // expected
@@ -99,18 +125,42 @@ class ZookeeperTest extends ZookeeperSuite {
     // Sets persistent, recursive watch on root node.
     zkw.observe(root.path, true)
 
+    // Verify that data change in root node triggers watch.
+    zk.sync.set(root.path, TestData, None)
+    var e = event.take()
+    e match {
+      case DataChanged(p) => assert(p === root.path)
+      case _ => fail(e.toString)
+    }
+
     // Verify that creation of child node triggers watch.
     var path = root.resolve("child_0").path
-    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
-    var e = event.take()
+    zk.sync.create(path, TestData, ACL.AnyoneAll, Persistent)
+    e = event.take()
     e match {
       case Created(p) => assert(p === path)
       case _ => fail(e.toString)
     }
 
+    // Since watch is recursive, verify that data change in child node triggers watch.
+    zk.sync.set(path, EmptyData, None)
+    e = event.take()
+    e match {
+      case DataChanged(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify that deletion of child node triggers watch.
+    zk.sync.delete(path, None)
+    e = event.take()
+    e match {
+      case Deleted(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
     // Since watch is persistent, verify that creation of another child node triggers watch.
     path = root.resolve("child_1").path
-    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    zk.sync.create(path, TestData, ACL.AnyoneAll, Persistent)
     e = event.take()
     e match {
       case Created(p) => assert(p === path)
@@ -118,11 +168,27 @@ class ZookeeperTest extends ZookeeperSuite {
     }
 
     // Since watch is recursive, creation of grandchild must trigger watch.
-    path = root.resolve("child_0/grandchild").path
-    zk.sync.create(path, Array[Byte](), ACL.AnyoneAll, Persistent)
+    path = root.resolve("child_1/grandchild").path
+    zk.sync.create(path, TestData, ACL.AnyoneAll, Persistent)
     e = event.take()
     e match {
       case Created(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify that data changed in grandchild triggers watch.
+    zk.sync.set(path, EmptyData, None)
+    e = event.take()
+    e match {
+      case DataChanged(p) => assert(p === path)
+      case _ => fail(e.toString)
+    }
+
+    // Verify that deletion of grandchild triggers watch.
+    zk.sync.delete(path, None)
+    e = event.take()
+    e match {
+      case Deleted(p) => assert(p === path)
       case _ => fail(e.toString)
     }
 
