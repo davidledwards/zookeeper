@@ -1,5 +1,12 @@
 # Scala API and CLI for ZooKeeper
 
+> [!NOTE]
+>
+> This repository has been split into two repositories to manage the API and CLI projects separately. Both repositories were cloned at commit [6ad2c34](https://github.com/davidledwards/zookeeper/commit/6ad2c34d799d4373aa077d89eecfde6e7e8e1612). No further changes will be made to this repository.
+>
+> * [zookeeper-client](https://github.com/davidledwards/zookeeper-client)
+> * [zookeeper-cli](https://github.com/davidledwards/zookeeper-cli)
+
 A collection of Scala artifacts that make working with ZooKeeper enjoyable.
 
 The project page with links to documentation can be found at <https://davidedwards.io/zookeeper/>.
