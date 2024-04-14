@@ -9,8 +9,6 @@
 
 A collection of Scala artifacts that make working with ZooKeeper enjoyable.
 
-The project page with links to documentation can be found at <https://davidedwards.io/zookeeper/>.
-
 ## Projects
 
 * [zookeeper-client](zookeeper-client/) - a functional API layered over the ZooKeeper client
