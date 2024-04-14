@@ -9,13 +9,6 @@
 
 A collection of Scala artifacts that make working with ZooKeeper enjoyable.
 
-## Projects
-
-* [zookeeper-client](zookeeper-client/) - a functional API layered over the ZooKeeper client
-* [zookeeper-cli](zookeeper-cli/) - a much nicer command line program that replaces `zkCli.sh`
-
-See individual subprojects for additional information. Note that `zookeeper-cli` depends on `zookeeper-client`.
-
 ## License
 
 Copyright 2015 David Edwards
